@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "Daymo",
+    "slug": "daymo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "daymo",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/images/icon.png",
+      "appleTeamId": "V5SYU7LHMG",
+      "bundleIdentifier": "io.flown.daymo",
+      "buildNumber": "8",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "supportsTablet": true
+    },
+    "android": {
+      "versionCode": 8,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "io.flown.daymo"
+    },
+    "plugins": [
+      "expo-localization",
+      "expo-router",
+      "@react-native-vector-icons/ionicons",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow Daymo to view, add, update, and delete your calendar events."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff",
+          "android": {
+            "image": "./assets/images/icon.png",
+            "imageWidth": 76
+          }
+        }
+      ],
+      "expo-font",
+      "expo-image",
+      [
+        "expo-status-bar",
+        {
+          "hidden": false
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "posthogProjectToken": "phc_tFK43ULRMzVvGo3BPR5xXHHyswi3nJNksUEAQBbPUNRE",
+      "posthogHost": "https://us.i.posthog.com"
+    }
+  }
+}
