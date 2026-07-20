@@ -64,6 +64,10 @@ run `bun run check`, and open a pull request describing the change and how it
 was verified. Releases will be published to the Google Play Store and App Store 
 as needed.
 
+## Use of Codex
+
+[OpenAI Codex](https://openai.com/codex/) was used as the development assistant for this project. Everything from implementation, troubleshooting and project ideation was assisted by Codex.
+
 ## Release builds
 
 Maintainers with signing credentials can prepare a release by:

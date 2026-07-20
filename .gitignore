@@ -46,3 +46,9 @@ unsigned.aab
 daymo.aab
 .iosbuildnumber
 .env
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example

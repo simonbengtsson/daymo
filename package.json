@@ -67,9 +67,11 @@
     "@types/react": "~19.2.17",
     "eslint": "^9.39.4",
     "eslint-config-expo": "~57.0.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "wrangler": "^4.112.0"
   },
   "scripts": {
+    "deploy:site": "bunx wrangler deploy",
     "build:aab": "rm -f daymo.aab && bun run _build:unsigned:aab && bun run _prepare:unsigned:aab && bun run _sign:aab && rm -f unsigned.aab",
     "_build:unsigned:aab": "cd android && ./gradlew bundleRelease",
     "_prepare:unsigned:aab": "cp ./android/app/build/outputs/bundle/release/app-release.aab ./unsigned.aab && zip -d ./unsigned.aab 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.DSA' 'META-INF/*.EC'",
@@ -81,6 +83,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "deploy": "bun --version && wrangler deploy",
+    "preview": "bun --version && wrangler dev"
   }
 }

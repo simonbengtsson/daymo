@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "daymo",
+  "compatibility_date": "2026-07-18",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./site"
+  },
+  "routes": [
+    {
+      "pattern": "daymo.flown.io",
+      "custom_domain": true
+    }
+  ],
+  "workers_dev": false,
+  "preview_urls": false
+}
