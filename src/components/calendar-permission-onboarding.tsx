@@ -1,5 +1,5 @@
-import * as Linking from 'expo-linking';
 import { Image } from 'expo-image';
+import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -97,7 +97,14 @@ export function CalendarPermissionOnboarding({
             style={{ marginTop: 14, maxWidth: 380, textAlign: 'center' }}
             themeColor="textSecondary"
           >
-            Daymo needs full calendar access to show your schedule and let you add or update events.
+            See upcoming weeks in a clear vertical view that keeps empty days, all-day events, and
+            multi-day plans easy to overview.
+          </AppText>
+          <AppText
+            style={{ marginTop: 10, maxWidth: 380, textAlign: 'center' }}
+            themeColor="textSecondary"
+          >
+            Allow calendar access to view and update events already on this device.
           </AppText>
 
           {isDenied ? (
@@ -194,7 +201,7 @@ export function CalendarPermissionOnboarding({
             themeColor="textSecondary"
             variant="footnote"
           >
-            Your calendar stays on this device.
+            Daymo does not collect your calendar data. Only anonymized app analytics are collected.
           </AppText>
         </View>
       </SafeAreaView>

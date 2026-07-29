@@ -71,6 +71,7 @@
     "wrangler": "^4.112.0"
   },
   "scripts": {
+    "dev": "bun site/index.html",
     "deploy:site": "bunx wrangler deploy",
     "build:aab": "rm -f daymo.aab && bun run _build:unsigned:aab && bun run _prepare:unsigned:aab && bun run _sign:aab && rm -f unsigned.aab",
     "_build:unsigned:aab": "cd android && ./gradlew bundleRelease",

@@ -1,10 +1,20 @@
 # Daymo
 
-A simple, local-first calendar app for iOS and Android. Daymo reads calendars already configured on your device and provides a focused agenda for viewing, creating, editing, and deleting events.
+Daymo is a free, open-source calendar for iOS and Android that makes upcoming days and weeks easier to overview at a glance.
+
+## Why Daymo?
+
+Daymo was created to help you quickly answer questions like "Does anything need my attention this week?" and "Is Friday a good day for that trip?".
+
+Upcoming weeks are displayed in a continuous vertical week view. It is similar to agenda views in other apps, but keeps empty days visible to keep your week easy to overview spatially. 
+
+All day and multi day events is also first class citizens with a minimal design to keep your week easy to scan.
+
+Daymo syncs with the device calendar so no new account is needed and all your existing calendar events are available when you start the app for the first time. The app is free, open source and no data is collected except for anonymized app analytics.
 
 ## App Installation
 
-App Store: https://apps.apple.com/app/daymo/id6762902133<br>
+App Store: https://apps.apple.com/do/app/daymo-calendar/id6786874221<br>
 Google Play: https://play.google.com/store/apps/details?id=io.flown.daymo
 
 ![Daymo](assets/images/social.jpg)
@@ -36,12 +46,9 @@ bun run ios
 bun run android
 ```
 
-These commands generate the native `ios` or `android` directory when needed.
-Both directories are intentionally ignored because this project uses Expo's
-Continuous Native Generation workflow.
+These commands generate the native `ios` or `android` directory when needed. Both directories are intentionally ignored because this project uses Expo's Continuous Native Generation workflow.
 
-After the first native build, start Metro for normal JavaScript and TypeScript
-development:
+After the first native build, start Metro for normal JavaScript and TypeScript development:
 
 ```sh
 bun run start
@@ -59,10 +66,7 @@ This runs TypeScript in type-checking mode without emitting build output.
 
 ## Contributing
 
-Contributions are welcome. Create a branch from `main`, keep changes focused,
-run `bun run check`, and open a pull request describing the change and how it
-was verified. Releases will be published to the Google Play Store and App Store 
-as needed.
+Contributions are welcome. Create a branch from `main`, keep changes focused, run `bun run check`, and open a pull request describing the change and how it was verified. Releases will be published to the Google Play Store and App Store as needed.
 
 ## Use of Codex
 
@@ -72,12 +76,9 @@ as needed.
 
 Maintainers with signing credentials can prepare a release by:
 
-1. Updating the app version, iOS build number, and Android version code in
-   `app.json`.
-2. Regenerating native projects with `bunx expo prebuild` when native
-   configuration has changed.
-3. Building the Android App Bundle with `bun run build:aab` after installing
-   the maintainer signing keystore.
+1. Updating the app version, iOS build number, and Android version code in `app.json`.
+2. Regenerating native projects with `bunx expo prebuild` when native configuration has changed.
+3. Building the Android App Bundle with `bun run build:aab` after installing the maintainer signing keystore.
 4. Archiving and submitting the iOS app through Xcode.
 
 ## License

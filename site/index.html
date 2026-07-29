@@ -6,16 +6,16 @@
     <meta name="theme-color" content="#f6f8fb" />
     <meta
       name="description"
-      content="Daymo is a simple, local-first calendar for iPhone and Android. See your days clearly and manage the calendars already on your phone."
+      content="Know what needs your attention and stay on top of your week.."
     />
-    <meta property="og:title" content="Daymo — Your week at a glance" />
+    <meta property="og:title" content="Daymo - Your week at a glance" />
     <meta
       property="og:description"
-      content="A focused, local-first calendar for iPhone and Android."
+      content="Know what needs your attention and stay on top of your week."
     />
     <meta property="og:image" content="assets/daymo-social.jpg" />
     <meta property="og:type" content="website" />
-    <title>Daymo — Your week at a glance</title>
+    <title>Daymo - Your week at a glance</title>
     <link rel="icon" href="assets/daymo-icon.png" />
     <style>
       :root {
@@ -182,6 +182,55 @@
         object-position: center;
       }
 
+      .why {
+        padding-block: 92px;
+      }
+
+      .why-heading {
+        max-width: 760px;
+      }
+
+      .why h2 {
+        margin: 0;
+        font-size: clamp(36px, 8vw, 60px);
+        font-weight: 740;
+        letter-spacing: -0.05em;
+        line-height: 1;
+      }
+
+      .why-intro {
+        margin: 24px 0 0;
+        color: var(--muted);
+        font-size: clamp(18px, 4.8vw, 21px);
+        line-height: 1.6;
+      }
+
+      .benefits {
+        display: grid;
+        gap: 14px;
+        margin-top: 44px;
+      }
+
+      .benefit {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        padding: 26px;
+      }
+
+      .benefit h3 {
+        margin: 0;
+        font-size: 19px;
+        letter-spacing: -0.02em;
+      }
+
+      .benefit p {
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.65;
+      }
+
       .footer {
         display: flex;
         flex-direction: column;
@@ -217,6 +266,10 @@
           height: 560px;
         }
 
+        .benefits {
+          grid-template-columns: repeat(3, 1fr);
+        }
+
         .footer {
           flex-direction: row;
           align-items: center;
@@ -242,6 +295,10 @@
           aspect-ratio: 1400 / 771;
           margin-top: 78px;
           border-radius: 44px;
+        }
+
+        .why {
+          padding-block: 124px;
         }
 
       }
@@ -270,16 +327,14 @@
     <main id="top">
       <section class="hero">
         <div class="hero-copy shell">
-          <div class="eyebrow">Stay organized</div>
           <h1>Your week<br />at a glance.</h1>
           <p>
-            Daymo turns the calendars already on your phone into one calm, focused agenda. No new
-            account. No new system to maintain.
+            Know what needs your attention and stay on top of things with a vertical week view. Daymo syncs with your device calendar and is free, open source and does not track user data.
           </p>
           <div class="store-links" aria-label="Download Daymo">
             <a
               class="store-link"
-              href="https://apps.apple.com/app/daymo/id6762902133"
+              href="https://apps.apple.com/do/app/daymo-calendar/id6786874221"
               aria-label="Download Daymo on the App Store"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -305,6 +360,39 @@
             src="assets/daymo-social.jpg"
             alt="Daymo agenda displayed on an iPhone beside the ocean"
           />
+        </div>
+      </section>
+
+      <section class="why shell" aria-labelledby="why-title">
+        <div class="why-heading">
+          <h2 id="why-title">Why Daymo?</h2>
+          <p class="why-intro">
+            Daymo was created to make questions like “Does anything need my attention this week?”
+            and “Is Friday a good day for that trip?” faster to answer.
+          </p>
+        </div>
+
+        <div class="benefits">
+          <article class="benefit">
+            <h3>Weeks in context</h3>
+            <p>
+              Upcoming weeks flow vertically, and empty days stay visible, so you can see when
+              events happen and how far away they are.
+            </p>
+          </article>
+          <article class="benefit">
+            <h3>Minimal all-day events</h3>
+            <p>
+              All-day and multi-day events are first-class parts of the view, with a minimal design
+              that keeps your schedule easy to scan.
+            </p>
+          </article>
+          <article class="benefit">
+            <h3>Your calendars, ready</h3>
+            <p>
+              Daymo uses the calendars already on your device. It is free, open source and does not track user data.
+            </p>
+          </article>
         </div>
       </section>
 
