@@ -4,7 +4,7 @@ Daymo is a free, open-source calendar for iOS and Android that makes upcoming da
 
 ## Why Daymo?
 
-Daymo was created to help you quickly answer questions like "Does anything need my attention this week?" and "Is Friday a good day for that trip?".
+Quickly answer questions like "Does anything need my attention this week?" and "Is Friday a good day for that trip?".
 
 Upcoming weeks are displayed in a continuous vertical week view. It is similar to agenda views in other apps, but keeps empty days visible to keep your week easy to overview spatially. 
 
