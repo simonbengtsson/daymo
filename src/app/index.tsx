@@ -63,6 +63,7 @@ type DateNavigationItemLayout = {
 type AgendaEvent = {
   id: string;
   eventId: string;
+  occurrenceStartDate: string;
   time: string;
   title: string;
   color: string;
@@ -890,7 +891,10 @@ function MultiDayEventMenu({ events }: { events: AgendaEvent[] }) {
 
     router.push({
       pathname: '/new-event',
-      params: { eventId: agendaEvent.eventId },
+      params: {
+        eventId: agendaEvent.eventId,
+        occurrenceStartDate: agendaEvent.occurrenceStartDate,
+      },
     });
   }
 
@@ -970,7 +974,10 @@ function AgendaEventRow({ event }: { event: AgendaEvent }) {
     posthog.capture('new_event_opened', { is_edit_mode: true });
     router.push({
       pathname: '/new-event',
-      params: { eventId: event.eventId },
+      params: {
+        eventId: event.eventId,
+        occurrenceStartDate: event.occurrenceStartDate,
+      },
     });
   }
 
@@ -1106,6 +1113,7 @@ function groupEventsByDay(events: CalendarEvent[], visibleStartDate: Date, visib
       dayEvents.push({
         id: `${event.id}-${dayKey}`,
         eventId: event.id,
+        occurrenceStartDate: toDate(event.startDate).toISOString(),
         time: '',
         title: event.title,
         color: event.calendarColor,
@@ -1130,6 +1138,7 @@ function groupEventsByDay(events: CalendarEvent[], visibleStartDate: Date, visib
     dayEvents.push({
       id: event.id,
       eventId: event.id,
+      occurrenceStartDate: toDate(event.startDate).toISOString(),
       time: event.allDay ? '' : formatTime(toDate(event.startDate)),
       title: event.title,
       color: event.calendarColor,

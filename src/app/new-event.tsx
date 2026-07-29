@@ -26,9 +26,16 @@ export default function NewEventModal() {
   const {
     allDay: allDayParam,
     eventId: eventIdParam,
+    occurrenceStartDate: occurrenceStartDateParam,
     startDate: startDateParam,
-  } = useLocalSearchParams<{ allDay?: string | string[]; eventId?: string | string[]; startDate?: string | string[] }>();
+  } = useLocalSearchParams<{
+    allDay?: string | string[];
+    eventId?: string | string[];
+    occurrenceStartDate?: string | string[];
+    startDate?: string | string[];
+  }>();
   const eventId = getFirstParam(eventIdParam);
+  const occurrenceStartDate = getFirstParam(occurrenceStartDateParam);
   const initialStartDate = parseDayParam(getFirstParam(startDateParam));
   const isEditMode = Boolean(eventId);
   const startsAsAllDay = !isEditMode && getFirstParam(allDayParam) === 'true' && initialStartDate != null;
@@ -134,7 +141,12 @@ export default function NewEventModal() {
       setIsLoadingEvent(true);
 
       try {
-        const event = await Calendar.ExpoCalendarEvent.get(eventIdToLoad);
+        const recurringEvent = await Calendar.ExpoCalendarEvent.get(eventIdToLoad);
+        const instanceStartDate = parseDateParam(occurrenceStartDate);
+        const event =
+          recurringEvent.recurrenceRule && instanceStartDate
+            ? recurringEvent.getOccurrenceSync({ instanceStartDate })
+            : recurringEvent;
 
         if (!isMounted) {
           return;
@@ -173,7 +185,7 @@ export default function NewEventModal() {
     return () => {
       isMounted = false;
     };
-  }, [eventId]);
+  }, [eventId, occurrenceStartDate]);
 
   function updateStartDate(nextStartDate: Date) {
     if (allDay) {
@@ -255,6 +267,8 @@ export default function NewEventModal() {
       }
 
       const allDayCalendarRange = allDay ? getAllDayCalendarRange(startDate, endDate) : null;
+      // Keep recurrenceRule out of this partial update so the existing series
+      // configuration is preserved while editing an occurrence.
       const eventDetails = {
         title: title.trim(),
         location: location.trim() || undefined,
@@ -613,6 +627,15 @@ function parseDayParam(dayKey: string | undefined) {
 
   const [, year, month, day] = match;
   return new Date(Number(year), Number(month) - 1, Number(day));
+}
+
+function parseDateParam(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function roundToNextHour(date: Date) {

@@ -91,7 +91,7 @@ export function CalendarPermissionOnboarding({
             style={{ height: 164, marginBottom: 36, width: 164 }}
           />
           <AppText style={{ maxWidth: 360, textAlign: 'center' }} variant="largeTitle">
-            Your days, in one place
+            Your week at a glance
           </AppText>
           <AppText
             style={{ marginTop: 14, maxWidth: 380, textAlign: 'center' }}
