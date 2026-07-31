@@ -78,7 +78,7 @@ Maintainers with signing credentials can prepare a release by:
 
 1. Updating the app version, iOS build number, and Android version code in `app.json`.
 2. Regenerating native projects with `bunx expo prebuild` when native configuration has changed (versions for example).
-3. Building the Android App Bundle with `bun run build:aab` after installing the maintainer signing keystore.
+3. Building the Android App Bundle with `bun run build:aab` after installing the maintainer signing keystore -> https://play.google.com/console/u/0/developers/6822011924129869646/app/4974301168795141139/test-and-release
 4. Archiving and submitting the iOS app through Xcode.
 
 ## License
