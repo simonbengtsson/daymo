@@ -10,7 +10,7 @@ Upcoming weeks are displayed in a continuous vertical week view. It is similar t
 
 All day and multi day events is also first class citizens with a minimal design to keep your week easy to scan.
 
-Daymo syncs with the device calendar so no new account is needed and all your existing calendar events are available when you start the app for the first time. The app is free, open source and no data is collected except for anonymized app analytics.
+Daymo syncs with the device calendar so no new account is needed and all your existing calendar events are available when you start the app for the first time. The app is free and open source.
 
 ## App Installation
 
