@@ -77,7 +77,7 @@ Contributions are welcome. Create a branch from `main`, keep changes focused, ru
 Maintainers with signing credentials can prepare a release by:
 
 1. Updating the app version, iOS build number, and Android version code in `app.json`.
-2. Regenerating native projects with `bunx expo prebuild` when native configuration has changed.
+2. Regenerating native projects with `bunx expo prebuild` when native configuration has changed (versions for example).
 3. Building the Android App Bundle with `bun run build:aab` after installing the maintainer signing keystore.
 4. Archiving and submitting the iOS app through Xcode.
 
