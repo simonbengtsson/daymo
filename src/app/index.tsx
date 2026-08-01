@@ -133,6 +133,7 @@ export default function Index() {
         allDay: event.allDay,
         calendarColor: calendarColors.get(event.calendarId) ?? primaryColor,
       }));
+      posthog.capture('events_loaded', { event_count: mappedEvents.length });
       setCalendarStatus('ready');
       return mappedEvents;
     } catch (error) {
@@ -140,7 +141,7 @@ export default function Index() {
       setCalendarStatus('error');
       return [];
     }
-  }, []);
+  }, [posthog]);
 
   const refreshCalendarEvents = useCallback(async () => {
     const events = await loadCalendarEvents(calendarWindowStart, calendarWindowEnd);
@@ -1106,12 +1107,13 @@ function groupEventsByDay(events: CalendarEvent[], visibleStartDate: Date, visib
   for (const { event, startDate, endDate, lane } of blockEvents) {
     const firstVisibleDate = maxDate(startDate, visibleStartDate);
     const lastVisibleDate = minDate(endDate, visibleEndDate);
+    const occurrenceId = getCalendarEventOccurrenceId(event);
 
     for (let date = firstVisibleDate; date < lastVisibleDate; date = addDays(date, 1)) {
       const dayKey = toDayKey(date);
       const dayEvents = eventsByDay.get(dayKey) ?? [];
       dayEvents.push({
-        id: `${event.id}-${dayKey}`,
+        id: `${occurrenceId}-${dayKey}`,
         eventId: event.id,
         occurrenceStartDate: toDate(event.startDate).toISOString(),
         time: '',
@@ -1136,7 +1138,7 @@ function groupEventsByDay(events: CalendarEvent[], visibleStartDate: Date, visib
     const key = toDayKey(toDate(event.startDate));
     const dayEvents = eventsByDay.get(key) ?? [];
     dayEvents.push({
-      id: event.id,
+      id: getCalendarEventOccurrenceId(event),
       eventId: event.id,
       occurrenceStartDate: toDate(event.startDate).toISOString(),
       time: event.allDay ? '' : formatTime(toDate(event.startDate)),
@@ -1176,13 +1178,17 @@ function assignIndicatorLanes(spans: { startDate: Date; endDate: Date; lane: num
 }
 
 function mergeCalendarEvents(currentEvents: CalendarEvent[], newEvents: CalendarEvent[]) {
-  const eventsById = new Map(currentEvents.map((event) => [event.id, event]));
+  const eventsById = new Map(currentEvents.map((event) => [getCalendarEventOccurrenceId(event), event]));
 
   for (const event of newEvents) {
-    eventsById.set(event.id, event);
+    eventsById.set(getCalendarEventOccurrenceId(event), event);
   }
 
   return Array.from(eventsById.values());
+}
+
+function getCalendarEventOccurrenceId(event: CalendarEvent) {
+  return `${event.id}-${toDate(event.startDate).toISOString()}`;
 }
 
 function sortCalendarEvents(events: CalendarEvent[]) {
