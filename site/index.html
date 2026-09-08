@@ -13,7 +13,7 @@
       property="og:description"
       content="Know what needs your attention and stay on top of your week."
     />
-    <meta property="og:image" content="assets/daymo-social.jpg" />
+    <meta property="og:image" content="assets/daymo-og.png" />
     <meta property="og:type" content="website" />
     <title>Daymo - Your week at a glance</title>
     <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon.png" />
@@ -28,6 +28,7 @@
         --blue: #087df1;
         --blue-dark: #0066cc;
         --radius: 24px;
+        --hero-radius: 32px;
       }
 
       * {
@@ -172,7 +173,7 @@
         height: 460px;
         overflow: hidden;
         margin-top: 58px;
-        border-radius: 32px;
+        border-radius: var(--hero-radius);
       }
 
       .hero-visual img {
@@ -248,7 +249,6 @@
       }
 
       .launchpact-badge {
-        align-self: flex-end;
         line-height: 0;
       }
 
@@ -288,6 +288,10 @@
       }
 
       @media (min-width: 800px) {
+        :root {
+          --hero-radius: 44px;
+        }
+
         .shell {
           width: min(100% - 64px, 1120px);
         }
@@ -304,7 +308,6 @@
           height: auto;
           aspect-ratio: 1400 / 771;
           margin-top: 78px;
-          border-radius: 44px;
         }
 
         .why {
@@ -339,7 +342,7 @@
         <div class="hero-copy shell">
           <h1>Your week<br />at a glance.</h1>
           <p>
-            Know what needs your attention and stay on top of things with a vertical week view. Daymo syncs with your device calendar and is free, open source and does not track user data.
+            A calendar with a simple vertical week list design that lets you easily scan what needs your attention. Daymo syncs with your device calendar and is free, open source and does not track user data.
           </p>
           <div class="store-links" aria-label="Download Daymo">
             <a
@@ -373,7 +376,7 @@
         </div>
       </section>
 
-      <section class="why shell" aria-labelledby="why-title">
+      <section class="why shell" aria-labelledby="why-title" style="padding-bottom: 20px">
         <div class="why-heading">
           <h2 id="why-title">Why Daymo?</h2>
           <p class="why-intro">
@@ -405,9 +408,18 @@
         </div>
       </section>
 
+      <figure class="shell">
+        <img
+          src="assets/vs_only.png"
+          alt="Calendar comparison showing Daymo’s overview of the upcoming week"
+          loading="lazy"
+          style="width: 100%; height: auto;"
+        />
+      </figure>
+
     </main>
 
-    <footer class="footer shell">
+    <footer class="footer shell" style="flex-wrap: wrap; align-items: center; gap: 24px; padding-block: 32px 40px; margin-top: 100px">
       <div class="footer-links">
         <a href="https://flown.io/privacypolicy">Privacy</a>
         <a href="https://github.com/simonbengtsson/daymo">GitHub</a>
@@ -423,6 +435,21 @@
           alt="Listed on LaunchPact"
           width="180"
           height="60"
+        />
+      </a>
+      <a href="https://www.launchory.app/startups/daymo?ref=badge" target="_blank">
+        <img src="https://www.launchory.app/api/badge/daymo?theme=light" alt="Featured on Launchory" width="240" height="54" />
+      </a>
+      <a
+        href="https://nicklaunches.com/products/daymo/?utm_source=daymo.flown.io&amp;utm_medium=badge&amp;utm_campaign=featured"
+        target="_blank"
+        rel="noopener"
+      >
+        <img
+          src="https://nicklaunches.com/badges/featured.png"
+          alt="Daymo on Nick Launches"
+          width="244"
+          height="56"
         />
       </a>
     </footer>

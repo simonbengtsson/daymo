@@ -59,16 +59,15 @@ export default function NewEventModal() {
   const displayedErrorMessage = dateRangeErrorMessage || errorMessage;
   const canSave =
     title.trim().length > 0 &&
-    selectedCalendarId.length > 0 &&
+    isWritableCalendar(selectedCalendar) &&
     dateRangeErrorMessage.length === 0 &&
     !isSaving &&
     !isDeleting &&
-    !isLoadingEvent &&
-    (!isEditMode || selectedCalendar?.allowsModifications);
+    !isLoadingEvent;
   const canDelete =
     isEditMode &&
     editingEvent != null &&
-    selectedCalendar?.allowsModifications === true &&
+    isWritableCalendar(selectedCalendar) &&
     !isSaving &&
     !isDeleting &&
     !isLoadingEvent;
@@ -102,7 +101,7 @@ export default function NewEventModal() {
 
         const visibleCalendars = isEditMode
           ? deviceCalendars
-          : deviceCalendars.filter((calendar) => calendar.allowsModifications);
+          : deviceCalendars.filter(isWritableCalendar);
         setCalendars(visibleCalendars);
 
         setSelectedCalendarId((currentCalendarId) => {
@@ -110,7 +109,7 @@ export default function NewEventModal() {
             return currentCalendarId;
           }
 
-          return getDefaultCalendarId(visibleCalendars.filter((calendar) => calendar.allowsModifications));
+          return getDefaultCalendarId(visibleCalendars);
         });
       } catch (error) {
         if (!isMounted) {
@@ -254,14 +253,14 @@ export default function NewEventModal() {
         }
 
         const deviceCalendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
-        const writableCalendars = deviceCalendars.filter((calendar) => calendar.allowsModifications);
+        const writableCalendars = deviceCalendars.filter(isWritableCalendar);
         setCalendars(writableCalendars);
         const fallbackCalendarId = selectedCalendarId || getDefaultCalendarId(writableCalendars);
         selectedCalendar = writableCalendars.find((calendar) => calendar.id === fallbackCalendarId);
         setSelectedCalendarId(fallbackCalendarId);
       }
 
-      if (!selectedCalendar) {
+      if (!selectedCalendar || !isWritableCalendar(selectedCalendar)) {
         setErrorMessage('No writable calendars are available on this device.');
         return;
       }
@@ -651,7 +650,12 @@ function addHours(date: Date, hours: number) {
   return nextDate;
 }
 
-function getDefaultCalendarId(calendars: Calendar.ExpoCalendar[]) {
+function isWritableCalendar(calendar: Calendar.ExpoCalendar | undefined) {
+  return calendar?.allowsModifications === true && calendar.type !== Calendar.CalendarType.SUBSCRIBED;
+}
+
+function getDefaultCalendarId(deviceCalendars: Calendar.ExpoCalendar[]) {
+  const calendars = deviceCalendars.filter(isWritableCalendar);
   if (calendars.length === 0) {
     return '';
   }

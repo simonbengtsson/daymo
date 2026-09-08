@@ -69,6 +69,10 @@ export default function TabLayout() {
               options={{ title: 'Today' }}
             />
             <Stack.Screen
+              name="calendars"
+              options={{ presentation: 'modal' }}
+            />
+            <Stack.Screen
               name="new-event"
               options={{
                 presentation: 'modal',

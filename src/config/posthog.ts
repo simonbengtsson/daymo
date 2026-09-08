@@ -14,7 +14,7 @@ if (!isPostHogConfigured) {
 
 export const posthog = new PostHog(projectToken || 'placeholder_key', {
   host,
-  disabled: !isPostHogConfigured,
+  disabled: __DEV__ || !isPostHogConfigured,
   errorTracking: {
     autocapture: {
       uncaughtExceptions: true,

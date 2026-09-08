@@ -26,6 +26,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addDays, getEventDayRange, isMultiDayRange, startOfDay, toDate } from '@/lib/calendar-event-range';
+import { useHiddenCalendarIds } from '@/lib/calendar-visibility';
 
 type AgendaItem =
   | {
@@ -99,6 +100,7 @@ export default function Index() {
   const posthog = usePostHog();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const hiddenCalendarIds = useHiddenCalendarIds();
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [calendarWindowEnd, setCalendarWindowEnd] = useState(initialCalendarWindowEnd);
   const [calendarStatus, setCalendarStatus] = useState<CalendarStatus>('loading');
@@ -167,8 +169,8 @@ export default function Index() {
   }, [refreshCalendarEvents]);
 
   const agendaModel = useMemo(
-    () => buildAgendaModel(calendarWindowStart, calendarWindowEnd, calendarEvents),
-    [calendarEvents, calendarWindowEnd]
+    () => buildAgendaModel(calendarWindowStart, calendarWindowEnd, calendarEvents.filter((event) => !hiddenCalendarIds.has(event.calendarId))),
+    [calendarEvents, calendarWindowEnd, hiddenCalendarIds]
   );
   const stickyWeekHeaderIndices = useMemo(
     () => agendaModel.items.flatMap((item, index) => (item.type === 'weekHeader' ? [index] : [])),
@@ -305,6 +307,9 @@ export default function Index() {
             <Stack.Toolbar.Menu
               accessibilityLabel="More options"
               icon={MoreHorizIcon}>
+              <Stack.Toolbar.MenuAction onPress={() => router.push('./calendars')}>
+                Calendars
+              </Stack.Toolbar.MenuAction>
               <Stack.Toolbar.MenuAction onPress={openPrivacyPolicy}>
                 Privacy Policy
               </Stack.Toolbar.MenuAction>
@@ -322,6 +327,9 @@ export default function Index() {
           <Stack.Toolbar.Menu
             accessibilityLabel="More options"
             icon="ellipsis">
+            <Stack.Toolbar.MenuAction onPress={() => router.push('./calendars')}>
+              Calendars
+            </Stack.Toolbar.MenuAction>
             <Stack.Toolbar.MenuAction onPress={openPrivacyPolicy}>
               Privacy Policy
             </Stack.Toolbar.MenuAction>
