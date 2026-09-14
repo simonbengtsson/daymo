@@ -39,11 +39,17 @@ export default function NewEventModal() {
   const initialStartDate = parseDayParam(getFirstParam(startDateParam));
   const isEditMode = Boolean(eventId);
   const startsAsAllDay = !isEditMode && getFirstParam(allDayParam) === 'true' && initialStartDate != null;
+  const [initialEventStart] = useState(() => {
+    if (!initialStartDate) return roundToNextHour(new Date());
+    const date = startOfDay(initialStartDate);
+    if (!startsAsAllDay) date.setHours(9);
+    return date;
+  });
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
   const [allDay, setAllDay] = useState(startsAsAllDay);
-  const [startDate, setStartDate] = useState(() => (startsAsAllDay ? startOfDay(initialStartDate) : roundToNextHour(new Date())));
-  const [endDate, setEndDate] = useState(() => (startsAsAllDay ? startOfDay(initialStartDate) : addHours(roundToNextHour(new Date()), 1)));
+  const [startDate, setStartDate] = useState(() => new Date(initialEventStart));
+  const [endDate, setEndDate] = useState(() => (startsAsAllDay ? new Date(initialEventStart) : addHours(initialEventStart, 1)));
   const [calendars, setCalendars] = useState<Calendar.ExpoCalendar[]>([]);
   const [selectedCalendarId, setSelectedCalendarId] = useState('');
   const [editingEvent, setEditingEvent] = useState<Calendar.ExpoCalendarEvent | null>(null);

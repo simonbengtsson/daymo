@@ -66,7 +66,11 @@ export default function TabLayout() {
           <Stack screenOptions={{ headerTransparent: true }}>
             <Stack.Screen
               name="index"
-              options={{ title: 'Today' }}
+              options={{ title: 'Overview' }}
+            />
+            <Stack.Screen
+              name="day"
+              options={{ title: 'Day' }}
             />
             <Stack.Screen
               name="calendars"

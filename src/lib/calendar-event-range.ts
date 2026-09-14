@@ -15,16 +15,15 @@ export type AllDayEditorRange = {
 };
 
 /**
- * Calendar APIs store event ranges with an exclusive end. The event editor uses
- * an inclusive end day because that is what people expect to select and read.
+ * Write calendar ranges with an exclusive midnight end. When reading, also
+ * accept end timestamps within the final day. The editor shows an inclusive day.
  */
-export function getAllDayEditorRange(startDate: string | Date, endDateExclusive: string | Date): AllDayEditorRange {
-  const start = startOfDay(toDate(startDate));
-  const exclusiveEnd = getValidExclusiveEnd(start, startOfDay(toDate(endDateExclusive)));
+export function getAllDayEditorRange(startDate: string | Date, endDate: string | Date): AllDayEditorRange {
+  const range = getEventDayRange({ startDate, endDate, allDay: true });
 
   return {
-    startDate: start,
-    endDate: addDays(exclusiveEnd, -1),
+    startDate: range.startDate,
+    endDate: addDays(range.endDateExclusive, -1),
   };
 }
 
@@ -44,18 +43,13 @@ export function getEventDayRange(event: CalendarEventDateRange): DayRange {
   const eventEnd = toDate(event.endDate);
   const start = startOfDay(eventStart);
 
-  if (event.allDay) {
-    return {
-      startDate: start,
-      endDateExclusive: getValidExclusiveEnd(start, startOfDay(eventEnd)),
-    };
-  }
-
   if (eventEnd <= eventStart) {
     return { startDate: start, endDateExclusive: addDays(start, 1) };
   }
 
   const endDay = startOfDay(eventEnd);
+  // Preserve the final day when a native all-day event ends at e.g. 23:59:59.
+  // An end exactly at midnight still excludes that day.
   const endDateExclusive = isStartOfDay(eventEnd) ? endDay : addDays(endDay, 1);
 
   return {

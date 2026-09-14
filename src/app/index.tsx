@@ -1,6 +1,8 @@
+import AddIcon from '@expo/material-symbols/add.xml';
 import MoreHorizIcon from '@expo/material-symbols/more_horiz.xml';
-import { MenuView, type NativeActionEvent } from '@expo/ui/community/menu';
+import { BottomSheet, RNHostView } from '@expo/ui';
 import { LegendList, type LegendListRef, type LegendListRenderItemProps } from '@legendapp/list/react-native';
+import { Ionicons } from '@react-native-vector-icons/ionicons';
 import * as Calendar from 'expo-calendar';
 import * as Linking from 'expo-linking';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
@@ -101,6 +103,7 @@ export default function Index() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const hiddenCalendarIds = useHiddenCalendarIds();
+  const [isCalendarSetSheetPresented, setIsCalendarSetSheetPresented] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [calendarWindowEnd, setCalendarWindowEnd] = useState(initialCalendarWindowEnd);
   const [calendarStatus, setCalendarStatus] = useState<CalendarStatus>('loading');
@@ -169,7 +172,9 @@ export default function Index() {
   }, [refreshCalendarEvents]);
 
   const agendaModel = useMemo(
-    () => buildAgendaModel(calendarWindowStart, calendarWindowEnd, calendarEvents.filter((event) => !hiddenCalendarIds.has(event.calendarId))),
+    () => buildAgendaModel(calendarWindowStart, calendarWindowEnd, calendarEvents.filter((event) =>
+      !hiddenCalendarIds.has(event.calendarId)
+    )),
     [calendarEvents, calendarWindowEnd, hiddenCalendarIds]
   );
   const stickyWeekHeaderIndices = useMemo(
@@ -182,7 +187,6 @@ export default function Index() {
   );
   const themedBorderStyle = { borderColor: theme.border };
   const dayRowDividerColor = withAlphaMultiplier(theme.border, dayRowDividerAlphaMultiplier);
-  const renderThemedAgendaItem = useCallback((props: LegendListRenderItemProps<AgendaItem>) => renderAgendaItem(props), []);
   const renderThemedAgendaSeparator = useCallback(
     ({ leadingItem, trailingItem }: { leadingItem: AgendaItem; trailingItem?: AgendaItem }) =>
       renderAgendaSeparator({ leadingItem, trailingItem }, dayRowDividerColor),
@@ -247,6 +251,24 @@ export default function Index() {
     });
   }
 
+  const switchCalendarButton = (
+    <Stack.Toolbar.View>
+      <Pressable
+        accessibilityLabel="Switch calendar set"
+        accessibilityRole="button"
+        onPress={() => setIsCalendarSetSheetPresented(true)}
+        style={({ pressed }) => ({
+          width: 44,
+          height: 44,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: pressed ? 0.72 : 1,
+        })}>
+        <Ionicons name="swap-horizontal" size={26} color={theme.text} />
+      </Pressable>
+    </Stack.Toolbar.View>
+  );
+
   return (
     <>
       <ThemedView style={{ flex: 1 }}>
@@ -267,7 +289,7 @@ export default function Index() {
               status={calendarStatus}
             />
           }
-          renderItem={renderThemedAgendaItem}
+          renderItem={renderAgendaItem}
           keyExtractor={(item) => item.id}
           stickyHeaderIndices={stickyWeekHeaderIndices}
           recycleItems
@@ -282,6 +304,40 @@ export default function Index() {
           style={[{ flex: 1 }, { backgroundColor: theme.background }]}
         />
       </ThemedView>
+      <BottomSheet
+        isPresented={isCalendarSetSheetPresented}
+        onDismiss={() => setIsCalendarSetSheetPresented(false)}
+        containerColor={theme.background}
+        testID="calendar-set-sheet">
+        <RNHostView matchContents>
+          <View style={{ paddingTop: spacing.base, paddingBottom: spacing.double, gap: spacing.double }}>
+            <AppText variant="title2" weight="semibold" accessibilityRole="header">
+              Calendar Sets
+            </AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: theme.border }}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setIsCalendarSetSheetPresented(false)}
+                style={({ pressed }) => ({ flex: 1, minHeight: 56, justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
+                <AppText>Main Calendar Set</AppText>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Edit Main Calendar Set"
+                onPress={() => {}}
+                style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
+                <Ionicons name="pencil-outline" size={22} color={theme.primary} />
+              </Pressable>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {}}
+              style={({ pressed }) => ({ minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: withOpacity(theme.primary, 0.12), opacity: pressed ? 0.72 : 1 })}>
+              <AppText weight="semibold" style={{ color: theme.primary }}>Add Calendar Set</AppText>
+            </Pressable>
+          </View>
+        </RNHostView>
+      </BottomSheet>
       <Stack.Screen
         options={{
           headerShown: false,
@@ -301,9 +357,13 @@ export default function Index() {
             <Stack.Toolbar.View>
               <View style={{ alignItems: 'center', flexDirection: 'row', gap: spacing.base }}>
                 <ToolbarTextButton label="Today" onPress={scrollToToday} />
-                <ToolbarTextButton accessibilityLabel="Add event" label="Add" onPress={() => { posthog.capture('new_event_opened'); router.push('/new-event'); }} />
               </View>
             </Stack.Toolbar.View>
+            <Stack.Toolbar.Button
+              accessibilityLabel="Add event"
+              icon={AddIcon}
+              onPress={() => { posthog.capture('new_event_opened'); router.push('/new-event'); }}
+            />
             <Stack.Toolbar.Menu
               accessibilityLabel="More options"
               icon={MoreHorizIcon}>
@@ -314,6 +374,8 @@ export default function Index() {
                 Privacy Policy
               </Stack.Toolbar.MenuAction>
             </Stack.Toolbar.Menu>
+            <Stack.Toolbar.Spacer width={spacing.base} />
+            {switchCalendarButton}
           </Stack.Toolbar>
         </View>
       ) : (
@@ -321,9 +383,11 @@ export default function Index() {
           <Stack.Toolbar.Button accessibilityLabel="Today" onPress={scrollToToday}>
             Today
           </Stack.Toolbar.Button>
-          <Stack.Toolbar.Button accessibilityLabel="Add event" onPress={() => { posthog.capture('new_event_opened'); router.push('/new-event'); }}>
-            Add
-          </Stack.Toolbar.Button>
+          <Stack.Toolbar.Button
+            accessibilityLabel="Add event"
+            icon="plus"
+            onPress={() => { posthog.capture('new_event_opened'); router.push('/new-event'); }}
+          />
           <Stack.Toolbar.Menu
             accessibilityLabel="More options"
             icon="ellipsis">
@@ -335,6 +399,7 @@ export default function Index() {
             </Stack.Toolbar.MenuAction>
           </Stack.Toolbar.Menu>
           <Stack.Toolbar.Spacer />
+          {switchCalendarButton}
         </Stack.Toolbar>
       )}
     </>
@@ -642,134 +707,37 @@ function renderAgendaItem({ item }: LegendListRenderItemProps<AgendaItem>) {
 
 function DayAgendaItem({ item }: { item: Extract<AgendaItem, { type: 'day' }> }) {
   const router = useRouter();
-  const posthog = usePostHog();
   const theme = useTheme();
   const weekendTextStyle = item.isWeekend ? { color: theme.textDestructive } : null;
-  const isEmptyDay = item.events.length === 0;
-  const hasOnlyContinuationLines = hasOnlyMultiDayContinuations(item.events);
-  const eventsContent =
-    isEmptyDay ? (
-      <ThemedView style={{ minHeight: spacing.double * 2, alignItems: 'flex-end', justifyContent: 'center' }} />
-    ) : (
-      <AgendaEvents events={item.events} />
-    );
+  const [indicatorStarts, setIndicatorStarts] = useState<Record<string, number>>({});
+  const onEventLayout = useCallback((id: string, centerY: number) => {
+    setIndicatorStarts((current) => current[id] === centerY ? current : { ...current, [id]: centerY });
+  }, []);
 
-  function openNewAllDayEvent() {
-    posthog.capture('new_event_opened', { all_day: true });
-    router.push({
-      pathname: '/new-event',
-      params: { allDay: 'true', startDate: item.id },
-    });
-  }
-
-  const dateColumnContent = (
-    <>
-      <AppText
-        selectable
-        variant="caption2"
-        weight="semibold"
-        style={weekendTextStyle}>
-        {item.weekday}
-      </AppText>
-      <View
-        style={{
-          width: spacing.double * 2,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginTop: -spacing.base / 2,
-        }}>
-        <AppText
-          selectable
-          variant="title2"
-          weight="semibold"
-          style={[{ fontVariant: ['tabular-nums'], includeFontPadding: false, lineHeight: 22 }, weekendTextStyle]}>
-          {item.dayNumber}
-        </AppText>
-      </View>
-    </>
-  );
-
-  const dateColumn = hasOnlyContinuationLines ? (
-    <Pressable
-      accessibilityRole="button"
-      onLongPress={openNewAllDayEvent}
-      style={{
-        width: spacing.double * 2,
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        paddingVertical: spacing.double,
-        gap: spacing.base,
-      }}>
-      {dateColumnContent}
-    </Pressable>
-  ) : (
-    <ThemedView
-      style={{
-        width: spacing.double * 2,
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        paddingVertical: spacing.double,
-        gap: spacing.base,
-      }}>
-      {dateColumnContent}
-    </ThemedView>
-  );
-
-  const dayRow = (
-    <>
-      {dateColumn}
-
-      <ThemedView
-        style={{
-          flex: 1,
-          justifyContent: 'flex-start',
-          paddingLeft: spacing.double,
-          paddingRight: spacing.base,
-          position: 'relative',
-        }}>
-        {hasOnlyContinuationLines ? (
-          <Pressable
-            accessibilityRole="button"
-            onLongPress={openNewAllDayEvent}
-            style={{ bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 }}
-          />
-        ) : null}
-        {eventsContent}
-      </ThemedView>
-    </>
-  );
-
-  if (isEmptyDay) {
-    return (
-      <ThemedView>
-        <Pressable
-          accessibilityRole="button"
-          onLongPress={openNewAllDayEvent}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'stretch',
-            position: 'relative',
-            paddingLeft: spacing.double,
-          }}>
-          {dayRow}
-        </Pressable>
-      </ThemedView>
-    );
+  function openDay() {
+    router.push({ pathname: './day', params: { date: item.id } });
   }
 
   return (
     <ThemedView>
       <Pressable
-        accessible={false}
-        onLongPress={openNewAllDayEvent}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'stretch',
-          position: 'relative',
-          paddingLeft: spacing.double,
-        }}>
-        {dayRow}
-        <MultiDayRowIndicator events={item.events} />
+        accessibilityRole="button"
+        accessibilityLabel={`View events for ${item.weekday}, ${item.id}`}
+        onPress={openDay}
+        onLongPress={openDay}
+        style={{ flexDirection: 'row', alignItems: 'stretch', position: 'relative', paddingLeft: spacing.double }}>
+        <MultiDayIndicator events={getMultiDayIndicatorEvents(item.events)} starts={indicatorStarts} />
+        <View pointerEvents="none" style={{ width: spacing.double * 2, alignItems: 'center', paddingVertical: spacing.double, gap: spacing.base }}>
+          <AppText variant="caption2" weight="semibold" style={weekendTextStyle}>{item.weekday}</AppText>
+          <View style={{ width: spacing.double * 2, alignItems: 'center', justifyContent: 'center', marginTop: -spacing.base / 2 }}>
+            <AppText variant="title2" weight="semibold" style={[{ fontVariant: ['tabular-nums'], includeFontPadding: false, lineHeight: 22 }, weekendTextStyle]}>
+              {item.dayNumber}
+            </AppText>
+          </View>
+        </View>
+        <View pointerEvents="none" style={{ flex: 1, paddingLeft: spacing.double, paddingRight: spacing.base }}>
+          <AgendaEvents events={item.events} onEventLayout={onEventLayout} />
+        </View>
       </Pressable>
     </ThemedView>
   );
@@ -800,51 +768,25 @@ function AgendaSeparator({ color, events = [] }: { color: string; events?: Agend
   );
 }
 
-function AgendaEvents({ events }: { events: AgendaEvent[] }) {
+function AgendaEvents({ events, onEventLayout }: { events: AgendaEvent[]; onEventLayout: (id: string, centerY: number) => void }) {
   const indicatorEvents = getMultiDayIndicatorEvents(events);
-  const visibleEvents = events.filter((event) => event.display !== 'multiDay' || event.showLabel);
-  const [firstVisibleEvent, ...remainingVisibleEvents] = visibleEvents;
+  const visibleEvents = events
+    .filter((event) => event.display !== 'multiDay' || event.showLabel)
+    .sort((first, second) => Number(indicatorEvents.includes(second)) - Number(indicatorEvents.includes(first)));
+  // Center ordinary event dots on the right edge of the rightmost active line.
+  const contentInset = indicatorEvents.length > 0 ? getMultiDayIndicatorWidth(indicatorEvents) - eventDotStyle.width / 2 : 0;
 
   return (
-    <ThemedView style={{ position: 'relative' }}>
-      {firstVisibleEvent ? (
-        <ThemedView style={{ flexDirection: 'row', alignItems: 'stretch' }}>
-          <ThemedView style={{ flex: 1, paddingVertical: spacing.base }}>
-            <AgendaEventRow event={firstVisibleEvent} />
-            {remainingVisibleEvents.map((event) => <AgendaEventRow key={event.id} event={event} />)}
-          </ThemedView>
-          <MultiDayIndicatorSpacer events={indicatorEvents} />
-        </ThemedView>
-      ) : indicatorEvents.length > 0 ? (
-        <ThemedView style={{ minHeight: spacing.double * 2, flexDirection: 'row', alignItems: 'stretch' }}>
-          <ThemedView style={{ flex: 1 }} />
-          <MultiDayIndicatorSpacer events={indicatorEvents} />
-        </ThemedView>
-      ) : (
-        <ThemedView style={{ minHeight: spacing.double * 2, alignItems: 'flex-end', justifyContent: 'center' }} />
-      )}
-    </ThemedView>
-  );
-}
-
-function hasOnlyMultiDayContinuations(events: AgendaEvent[]) {
-  return events.length > 0 && events.every((event) => event.display === 'multiDay' && !event.showLabel && (event.continuesBefore || event.continuesAfter));
-}
-
-function MultiDayIndicatorSpacer({ events }: { events: AgendaEvent[] }) {
-  const lineCanvasWidth = getMultiDayIndicatorWidth(events);
-
-  if (events.length === 0) {
-    return null;
-  }
-
-  return (
-    <View
-      style={{
-        width: lineCanvasWidth + spacing.double + spacing.base,
-        alignSelf: 'stretch',
-      }}
-    />
+    <View pointerEvents="box-none" style={{ minHeight: spacing.double * 2, paddingVertical: spacing.base }}>
+      {visibleEvents.map((event) => (
+        <AgendaEventRow
+          key={event.id}
+          event={event}
+          inset={indicatorEvents.includes(event) ? (event.indicatorLane ?? 0) * multiDayIndicatorLaneWidth : contentInset}
+          onLayout={(layout) => onEventLayout(event.id, layout.nativeEvent.layout.y + layout.nativeEvent.layout.height / 2 + 1)}
+        />
+      ))}
+    </View>
   );
 }
 
@@ -852,69 +794,54 @@ function MultiDayDividerIndicator({ events }: { events: AgendaEvent[] }) {
   return <MultiDayIndicator events={events} roundedCaps={false} />;
 }
 
-function MultiDayRowIndicator({ events }: { events: AgendaEvent[] }) {
-  return <MultiDayIndicator events={getMultiDayIndicatorEvents(events)} withMenu />;
-}
-
-function MultiDayIndicator({ events, roundedCaps = true, withMenu = false }: { events: AgendaEvent[]; roundedCaps?: boolean; withMenu?: boolean }) {
+function MultiDayIndicator({ events, starts = {}, roundedCaps = true }: { events: AgendaEvent[]; starts?: Record<string, number>; roundedCaps?: boolean }) {
   if (events.length === 0) {
     return null;
   }
 
   return (
     <View
-      pointerEvents={withMenu ? 'box-none' : 'none'}
+      pointerEvents="none"
       style={{
         bottom: 0,
         position: 'absolute',
-        right: spacing.double,
+        left: spacing.double * 4,
         top: 0,
         width: getMultiDayIndicatorWidth(events),
       }}>
-      {withMenu ? <MultiDayEventMenu events={events} /> : null}
-      <MultiDayIndicatorCanvas events={events} roundedCaps={roundedCaps} />
+      <MultiDayIndicatorCanvas events={events} starts={starts} roundedCaps={roundedCaps} />
     </View>
   );
 }
 
-function MultiDayIndicatorCanvas({ events, roundedCaps = true }: { events: AgendaEvent[]; roundedCaps?: boolean }) {
+function MultiDayIndicatorCanvas({ events, starts, roundedCaps = true }: { events: AgendaEvent[]; starts: Record<string, number>; roundedCaps?: boolean }) {
+  const theme = useTheme();
+
   return (
-    <View pointerEvents="none" style={{ bottom: 0, position: 'absolute', right: 0, top: 0, width: getMultiDayIndicatorWidth(events) }}>
-      {events.map((event) => (
-        <View key={`${event.id}-line`} pointerEvents="none" style={getMultiDayIndicatorStyle(event, roundedCaps)} />
+    <View pointerEvents="none" style={{ bottom: 0, position: 'absolute', left: 0, top: 0, width: getMultiDayIndicatorWidth(events) }}>
+      {[...events].sort((first, second) => (first.indicatorLane ?? 0) - (second.indicatorLane ?? 0)).map((event) => (
+        <View
+          key={`${event.id}-line`}
+          style={{
+            ...getMultiDayIndicatorStyle(event, roundedCaps, starts[event.id]),
+            backgroundColor: theme.background,
+            borderColor: theme.background,
+            borderLeftWidth: 1,
+            borderRightWidth: 1,
+            borderTopWidth: roundedCaps && !event.continuesBefore ? 1 : 0,
+            borderBottomWidth: roundedCaps && !event.continuesAfter ? 1 : 0,
+            overflow: 'hidden',
+          }}>
+          <View style={{
+            flex: 1,
+            backgroundColor: event.color,
+            opacity: 0.22,
+            borderBottomLeftRadius: roundedCaps && !event.continuesAfter ? multiDayIndicatorLineRadius - 1 : 0,
+            borderBottomRightRadius: roundedCaps && !event.continuesAfter ? multiDayIndicatorLineRadius - 1 : 0,
+          }} />
+        </View>
       ))}
     </View>
-  );
-}
-
-function MultiDayEventMenu({ events }: { events: AgendaEvent[] }) {
-  const router = useRouter();
-
-  function openEvent(event: NativeActionEvent) {
-    const selectedEventRowId = event.nativeEvent.event;
-    const agendaEvent = events.find((candidate) => candidate.id === selectedEventRowId);
-
-    if (!agendaEvent) {
-      return;
-    }
-
-    router.push({
-      pathname: '/new-event',
-      params: {
-        eventId: agendaEvent.eventId,
-        occurrenceStartDate: agendaEvent.occurrenceStartDate,
-      },
-    });
-  }
-
-  return (
-    <MenuView
-      actions={events.map((event) => ({ id: event.id, title: event.title }))}
-      onPressAction={openEvent}
-      style={{ bottom: 0, left: -spacing.double, position: 'absolute', right: -spacing.double, top: 0 }}
-      testID="all-day-event-menu">
-      <View style={{ flex: 1 }} />
-    </MenuView>
   );
 }
 
@@ -935,7 +862,7 @@ function getMultiDayIndicatorWidth(events: AgendaEvent[]) {
   return maxLane * multiDayIndicatorLaneWidth + multiDayIndicatorLineWidth;
 }
 
-function getMultiDayIndicatorStyle(event: AgendaEvent, roundedCaps: boolean) {
+function getMultiDayIndicatorStyle(event: AgendaEvent, roundedCaps: boolean, start?: number) {
   const lane = event.indicatorLane ?? 0;
   const hasStartCap = roundedCaps && !event.continuesBefore;
   const hasEndCap = roundedCaps && !event.continuesAfter;
@@ -950,26 +877,25 @@ function getMultiDayIndicatorStyle(event: AgendaEvent, roundedCaps: boolean) {
     borderTopRightRadius: topRadius,
     bottom: hasEndCap ? multiDayIndicatorEndInset : 0,
     position: 'absolute' as const,
-    right: lane * multiDayIndicatorLaneWidth,
-    top: hasStartCap ? multiDayIndicatorEndInset : 0,
+    left: lane * multiDayIndicatorLaneWidth,
+    top: hasStartCap ? (start ?? spacing.base + agendaEventRowMinHeight / 2 + 1) : 0,
     width: multiDayIndicatorLineWidth,
   };
 }
 
-function AgendaEventRow({ event }: { event: AgendaEvent }) {
-  const router = useRouter();
-  const posthog = usePostHog();
+function AgendaEventRow({ event, inset = 0, onLayout }: { event: AgendaEvent; inset?: number; onLayout?: (event: LayoutChangeEvent) => void }) {
+  const theme = useTheme();
   const eventContent =
     event.display === 'multiDay' ? (
       <>
-        <ThemedView style={[eventDotStyle, { backgroundColor: event.color }]} />
+        <View style={[eventDotStyle, { backgroundColor: event.color, borderColor: theme.background }]} />
         <AppText variant="body" style={{ flex: 1 }}>
           {event.title}
         </AppText>
       </>
     ) : (
       <>
-        <ThemedView style={[eventDotStyle, { backgroundColor: event.color }]} />
+        <View style={[eventDotStyle, { backgroundColor: event.color, borderColor: theme.background }]} />
         <AppText variant="body" themeColor="textSecondary" style={{ fontVariant: ['tabular-nums'] }}>
           {event.time}
         </AppText>
@@ -979,32 +905,19 @@ function AgendaEventRow({ event }: { event: AgendaEvent }) {
       </>
     );
 
-  function openEvent() {
-    posthog.capture('new_event_opened', { is_edit_mode: true });
-    router.push({
-      pathname: '/new-event',
-      params: {
-        eventId: event.eventId,
-        occurrenceStartDate: event.occurrenceStartDate,
-      },
-    });
-  }
-
   return (
-    <ThemedView style={{ minHeight: spacing.double * 2, flexDirection: 'row', alignItems: 'center', gap: spacing.base }}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={openEvent}
+    <View onLayout={onLayout} pointerEvents="box-none" style={{ minHeight: agendaEventRowMinHeight, marginLeft: inset, flexDirection: 'row', alignItems: 'center', gap: spacing.base }}>
+      <View
         style={{
-          minHeight: spacing.double * 2,
+          minHeight: agendaEventRowMinHeight,
           flex: 1,
           flexDirection: 'row',
           alignItems: 'center',
           gap: spacing.base,
         }}>
         {eventContent}
-      </Pressable>
-    </ThemedView>
+      </View>
+    </View>
   );
 }
 
@@ -1312,12 +1225,15 @@ const dateNavigationContentHeight = 58;
 const dateNavigationEndReachedThreshold = spacing.double * 8;
 const dateNavigationVerticalGestureThreshold = 0;
 const eventDotStyle = {
-  width: spacing.base,
-  height: spacing.base,
-  borderRadius: spacing.base / 2,
+  width: 12,
+  height: 12,
+  borderRadius: 6,
+  borderWidth: 1,
+  flexShrink: 0,
   transform: [{ translateY: 1 }],
 };
-const multiDayIndicatorLineWidth = 5;
+const agendaEventRowMinHeight = 28;
+const multiDayIndicatorLineWidth = 12;
 const multiDayIndicatorLineRadius = multiDayIndicatorLineWidth / 2;
-const multiDayIndicatorLaneWidth = multiDayIndicatorLineWidth + spacing.base;
+const multiDayIndicatorLaneWidth = 6;
 const multiDayIndicatorEndInset = spacing.base;
