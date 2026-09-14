@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useGlobalSe
 import * as Calendar from 'expo-calendar';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { PostHogProvider } from 'posthog-react-native';
 
 import { CalendarPermissionOnboarding } from '@/components/calendar-permission-onboarding';
@@ -70,7 +70,12 @@ export default function TabLayout() {
             />
             <Stack.Screen
               name="day"
-              options={{ title: 'Day' }}
+              options={{
+                title: 'Day',
+                headerLargeTitle: true,
+                headerBackButtonDisplayMode: 'minimal',
+                headerTransparent: Platform.OS === 'ios',
+              }}
             />
             <Stack.Screen
               name="calendars"

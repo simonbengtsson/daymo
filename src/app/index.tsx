@@ -9,12 +9,12 @@ import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
-  type GestureResponderEvent,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   View,
 } from 'react-native';
@@ -93,8 +93,9 @@ type CalendarStatus = 'loading' | 'ready' | 'denied' | 'unavailable' | 'error';
 const initialCalendarWindowMonths = 12;
 const calendarWindowChunkDays = 120;
 const weekHeaderHeight = 34;
-const calendarWindowStart = startOfDay(new Date());
-const initialCalendarWindowEnd = addMonths(calendarWindowStart, initialCalendarWindowMonths);
+const initialCalendarWindowStart = startOfDay(new Date());
+const historyChunkDays = 28;
+const initialCalendarWindowEnd = addMonths(initialCalendarWindowStart, initialCalendarWindowMonths);
 
 export default function Index() {
   const agendaListRef = useRef<LegendListRef>(null);
@@ -105,6 +106,13 @@ export default function Index() {
   const hiddenCalendarIds = useHiddenCalendarIds();
   const [isCalendarSetSheetPresented, setIsCalendarSetSheetPresented] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [calendarWindowStart, setCalendarWindowStart] = useState(initialCalendarWindowStart);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyPullState, setHistoryPullState] = useState<'idle' | 'ready' | 'cancelled'>('idle');
+  const isDraggingAgendaRef = useRef(false);
+  const agendaScrollOffsetRef = useRef(0);
+  const historyTriggerOffsetRef = useRef<number | null>(null);
+  const calendarRevisionRef = useRef(0);
   const [calendarWindowEnd, setCalendarWindowEnd] = useState(initialCalendarWindowEnd);
   const [calendarStatus, setCalendarStatus] = useState<CalendarStatus>('loading');
   const [selectedNavigationId, setSelectedNavigationId] = useState(() => getDateNavigationId(calendarWindowStart));
@@ -114,7 +122,7 @@ export default function Index() {
   const loadCalendarEvents = useCallback(async (startDate: Date, endDate: Date) => {
     if (Platform.OS === 'web') {
       setCalendarStatus('unavailable');
-      return [];
+      return null;
     }
 
     try {
@@ -122,7 +130,7 @@ export default function Index() {
 
       if (!permission.granted) {
         setCalendarStatus('denied');
-        return [];
+        return null;
       }
 
       const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
@@ -144,14 +152,17 @@ export default function Index() {
     } catch (error) {
       console.warn('Failed to load calendar events', error);
       setCalendarStatus('error');
-      return [];
+      return null;
     }
   }, [posthog]);
 
   const refreshCalendarEvents = useCallback(async () => {
+    const revision = calendarRevisionRef.current;
     const events = await loadCalendarEvents(calendarWindowStart, calendarWindowEnd);
-    setCalendarEvents(sortCalendarEvents(events));
-  }, [calendarWindowEnd, loadCalendarEvents]);
+    if (events != null && revision === calendarRevisionRef.current) {
+      setCalendarEvents(sortCalendarEvents(events));
+    }
+  }, [calendarWindowStart, calendarWindowEnd, loadCalendarEvents]);
 
   useFocusEffect(
     useCallback(() => {
@@ -175,7 +186,7 @@ export default function Index() {
     () => buildAgendaModel(calendarWindowStart, calendarWindowEnd, calendarEvents.filter((event) =>
       !hiddenCalendarIds.has(event.calendarId)
     )),
-    [calendarEvents, calendarWindowEnd, hiddenCalendarIds]
+    [calendarEvents, calendarWindowStart, calendarWindowEnd, hiddenCalendarIds]
   );
   const stickyWeekHeaderIndices = useMemo(
     () => agendaModel.items.flatMap((item, index) => (item.type === 'weekHeader' ? [index] : [])),
@@ -183,7 +194,7 @@ export default function Index() {
   );
   const dateNavigationItems = useMemo(
     () => buildDateNavigationItems(calendarWindowStart, calendarWindowEnd, agendaModel.items),
-    [agendaModel.items, calendarWindowEnd]
+    [agendaModel.items, calendarWindowStart, calendarWindowEnd]
   );
   const themedBorderStyle = { borderColor: theme.border };
   const dayRowDividerColor = withAlphaMultiplier(theme.border, dayRowDividerAlphaMultiplier);
@@ -220,15 +231,77 @@ export default function Index() {
     const nextWindowEnd = addDays(calendarWindowEnd, calendarWindowChunkDays);
     const newEvents = await loadCalendarEvents(calendarWindowEnd, nextWindowEnd);
 
-    setCalendarEvents((currentEvents) => sortCalendarEvents(mergeCalendarEvents(currentEvents, newEvents)));
-    setCalendarWindowEnd(nextWindowEnd);
+    if (newEvents != null) {
+      calendarRevisionRef.current += 1;
+      setCalendarEvents((currentEvents) => sortCalendarEvents(mergeCalendarEvents(currentEvents, newEvents)));
+      setCalendarWindowEnd(nextWindowEnd);
+    }
     isLoadingMoreRef.current = false;
   }
 
+  const loadHistory = useCallback(async () => {
+    if (isLoadingMoreRef.current || calendarStatus === 'loading') {
+      return;
+    }
+
+    isLoadingMoreRef.current = true;
+    setIsLoadingHistory(true);
+    try {
+      const nextWindowStart = addDays(calendarWindowStart, -historyChunkDays);
+      const newEvents = await loadCalendarEvents(nextWindowStart, calendarWindowStart);
+      if (newEvents != null) {
+        calendarRevisionRef.current += 1;
+        setCalendarEvents((currentEvents) => sortCalendarEvents(mergeCalendarEvents(currentEvents, newEvents)));
+        setCalendarWindowStart(nextWindowStart);
+      }
+    } finally {
+      isLoadingMoreRef.current = false;
+      setIsLoadingHistory(false);
+    }
+  }, [calendarStatus, calendarWindowStart, loadCalendarEvents]);
+
+  function armHistoryLoad() {
+    // Android's native refresh event already waits for release. iOS can emit it
+    // while the finger is still down, so defer the request until drag end.
+    if (Platform.OS !== 'ios') {
+      void loadHistory();
+      return;
+    }
+    if (!isDraggingAgendaRef.current || isLoadingMoreRef.current || calendarStatus === 'loading') {
+      return;
+    }
+    historyTriggerOffsetRef.current = Math.min(-1, agendaScrollOffsetRef.current);
+    setHistoryPullState('ready');
+  }
+
+  function updateHistoryPull(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const offset = event.nativeEvent.contentOffset.y;
+    agendaScrollOffsetRef.current = offset;
+    const triggerOffset = historyTriggerOffsetRef.current;
+    if (isDraggingAgendaRef.current && triggerOffset != null) {
+      setHistoryPullState(offset <= triggerOffset ? 'ready' : 'cancelled');
+    }
+  }
+
+  function finishHistoryPull(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const triggerOffset = historyTriggerOffsetRef.current;
+    isDraggingAgendaRef.current = false;
+    historyTriggerOffsetRef.current = null;
+    setHistoryPullState('idle');
+    if (triggerOffset != null && event.nativeEvent.contentOffset.y <= triggerOffset) {
+      void loadHistory();
+    }
+  }
+
   function scrollToToday() {
-    pendingNavigationIdRef.current = getDateNavigationId(calendarWindowStart);
-    setSelectedNavigationId(getDateNavigationId(calendarWindowStart));
-    agendaListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    const today = startOfDay(new Date());
+    const todayIndex = agendaModel.items.findIndex((item) => item.id === toDayKey(today));
+    if (todayIndex < 0) {
+      return;
+    }
+    pendingNavigationIdRef.current = getDateNavigationId(today);
+    setSelectedNavigationId(getDateNavigationId(today));
+    void agendaListRef.current?.scrollToIndex({ index: todayIndex, animated: true, viewOffset: weekHeaderHeight });
   }
 
   function navigateToDateRange(item: DateNavigationItem) {
@@ -264,7 +337,7 @@ export default function Index() {
           justifyContent: 'center',
           opacity: pressed ? 0.72 : 1,
         })}>
-        <Ionicons name="swap-horizontal" size={26} color={theme.text} />
+        <Ionicons name="calendar-outline" size={26} color={theme.text} />
       </Pressable>
     </Stack.Toolbar.View>
   );
@@ -293,10 +366,34 @@ export default function Index() {
           keyExtractor={(item) => item.id}
           stickyHeaderIndices={stickyWeekHeaderIndices}
           recycleItems
-          maintainVisibleContentPosition
+          maintainVisibleContentPosition={{ data: true, size: true, shouldRestorePosition: (item) => item.type === 'day' }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoadingHistory || historyPullState !== 'idle'}
+              onRefresh={armHistoryLoad}
+              title={isLoadingHistory ? 'Loading history…' : historyPullState === 'ready' ? 'Release to load history' : 'Pull to load history'}
+              titleColor={theme.textSecondary}
+              tintColor={theme.primary}
+              colors={[theme.primary]}
+              progressBackgroundColor={theme.background}
+            />
+          }
           onFirstVisibleItemChanged={updateSelectedNavigationItem}
           onMomentumScrollEnd={clearPendingNavigation}
-          onScrollBeginDrag={clearPendingNavigation}
+          onScrollBeginDrag={() => {
+            clearPendingNavigation();
+            isDraggingAgendaRef.current = true;
+            historyTriggerOffsetRef.current = null;
+            setHistoryPullState('idle');
+          }}
+          onScroll={updateHistoryPull}
+          onScrollEndDrag={finishHistoryPull}
+          onTouchCancel={() => {
+            isDraggingAgendaRef.current = false;
+            historyTriggerOffsetRef.current = null;
+            setHistoryPullState('idle');
+          }}
+          scrollEventThrottle={16}
           onEndReached={loadMoreFutureDays}
           onEndReachedThreshold={0.6}
           showsVerticalScrollIndicator={false}
@@ -465,7 +562,6 @@ function DateNavigationHeader({
   const lastAutoScrolledNavigationIdRef = useRef<string | null>(null);
   const scrollXRef = useRef(0);
   const viewportWidthRef = useRef(0);
-  const headerGestureStartRef = useRef<{ x: number; y: number } | null>(null);
   const [layoutVersion, setLayoutVersion] = useState(0);
 
   useEffect(() => {
@@ -539,39 +635,8 @@ function DateNavigationHeader({
     }
   }
 
-  function rememberHeaderGestureStart(event: GestureResponderEvent) {
-    headerGestureStartRef.current = {
-      x: event.nativeEvent.pageX,
-      y: event.nativeEvent.pageY,
-    };
-
-    return false;
-  }
-
-  function captureVerticalHeaderGesture(event: GestureResponderEvent) {
-    const headerGestureStart = headerGestureStartRef.current;
-
-    if (headerGestureStart == null) {
-      return false;
-    }
-
-    const horizontalDistance = Math.abs(event.nativeEvent.pageX - headerGestureStart.x);
-    const verticalDistance = Math.abs(event.nativeEvent.pageY - headerGestureStart.y);
-
-    return verticalDistance > dateNavigationVerticalGestureThreshold && verticalDistance > horizontalDistance;
-  }
-
-  function clearHeaderGestureStart() {
-    headerGestureStartRef.current = null;
-  }
-
   return (
     <ThemedView
-      onMoveShouldSetResponderCapture={captureVerticalHeaderGesture}
-      onResponderRelease={clearHeaderGestureStart}
-      onResponderTerminate={clearHeaderGestureStart}
-      onResponderTerminationRequest={() => false}
-      onStartShouldSetResponderCapture={rememberHeaderGestureStart}
       style={[
         {
           borderBottomWidth: 1,
@@ -585,6 +650,7 @@ function DateNavigationHeader({
         bounces={false}
         directionalLockEnabled
         horizontal
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         contentContainerStyle={{
           alignItems: 'center',
           gap: spacing.base,
@@ -708,7 +774,7 @@ function renderAgendaItem({ item }: LegendListRenderItemProps<AgendaItem>) {
 function DayAgendaItem({ item }: { item: Extract<AgendaItem, { type: 'day' }> }) {
   const router = useRouter();
   const theme = useTheme();
-  const weekendTextStyle = item.isWeekend ? { color: theme.textDestructive } : null;
+  const dateTextStyle = item.isToday ? { color: theme.primary } : item.isWeekend ? { color: theme.textDestructive } : null;
   const [indicatorStarts, setIndicatorStarts] = useState<Record<string, number>>({});
   const onEventLayout = useCallback((id: string, centerY: number) => {
     setIndicatorStarts((current) => current[id] === centerY ? current : { ...current, [id]: centerY });
@@ -728,9 +794,9 @@ function DayAgendaItem({ item }: { item: Extract<AgendaItem, { type: 'day' }> })
         style={{ flexDirection: 'row', alignItems: 'stretch', position: 'relative', paddingLeft: spacing.double }}>
         <MultiDayIndicator events={getMultiDayIndicatorEvents(item.events)} starts={indicatorStarts} />
         <View pointerEvents="none" style={{ width: spacing.double * 2, alignItems: 'center', paddingVertical: spacing.double, gap: spacing.base }}>
-          <AppText variant="caption2" weight="semibold" style={weekendTextStyle}>{item.weekday}</AppText>
+          <AppText variant="caption2" weight="semibold" style={dateTextStyle}>{item.weekday}</AppText>
           <View style={{ width: spacing.double * 2, alignItems: 'center', justifyContent: 'center', marginTop: -spacing.base / 2 }}>
-            <AppText variant="title2" weight="semibold" style={[{ fontVariant: ['tabular-nums'], includeFontPadding: false, lineHeight: 22 }, weekendTextStyle]}>
+            <AppText variant="title2" weight="semibold" style={[{ fontVariant: ['tabular-nums'], includeFontPadding: false, lineHeight: 22 }, dateTextStyle]}>
               {item.dayNumber}
             </AppText>
           </View>
@@ -1223,7 +1289,6 @@ const dayRowDividerAlphaMultiplier = 0.75;
 const dateNavigationAutoScrollInset = spacing.double;
 const dateNavigationContentHeight = 58;
 const dateNavigationEndReachedThreshold = spacing.double * 8;
-const dateNavigationVerticalGestureThreshold = 0;
 const eventDotStyle = {
   width: 12,
   height: 12,

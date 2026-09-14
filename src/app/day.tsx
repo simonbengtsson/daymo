@@ -147,9 +147,6 @@ export default function DayPage() {
       />
       <Stack.Screen options={{
         title: date ? date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }) : 'Day',
-        headerLargeTitle: true,
-        headerBackButtonDisplayMode: 'minimal',
-        headerTransparent: false,
       }} />
       {Platform.OS === 'android' ? (
         <View pointerEvents="box-none" style={{ bottom: 0, height: 64 + insets.bottom, left: spacing.base, position: 'absolute', right: spacing.base }}>
