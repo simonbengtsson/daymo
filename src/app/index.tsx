@@ -1,6 +1,9 @@
 import AddIcon from '@expo/material-symbols/add.xml';
 import MoreHorizIcon from '@expo/material-symbols/more_horiz.xml';
-import { BottomSheet, RNHostView } from '@expo/ui';
+import { BottomSheet, Column, RNHostView } from '@expo/ui';
+import { HorizontalFloatingToolbar, Host, Icon, IconButton } from '@expo/ui/jetpack-compose';
+import { fillMaxWidth, height } from '@expo/ui/jetpack-compose/modifiers';
+import { frame } from '@expo/ui/swift-ui/modifiers';
 import { LegendList, type LegendListRef, type LegendListRenderItemProps } from '@legendapp/list/react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import * as Calendar from 'expo-calendar';
@@ -14,7 +17,6 @@ import {
   type NativeSyntheticEvent,
   Platform,
   Pressable,
-  RefreshControl,
   ScrollView,
   View,
 } from 'react-native';
@@ -43,6 +45,7 @@ type AgendaItem =
       dayNumber: string;
       weekday: string;
       isToday: boolean;
+      isPast: boolean;
       isWeekend?: boolean;
       events: AgendaEvent[];
     };
@@ -93,9 +96,9 @@ type CalendarStatus = 'loading' | 'ready' | 'denied' | 'unavailable' | 'error';
 const initialCalendarWindowMonths = 12;
 const calendarWindowChunkDays = 120;
 const weekHeaderHeight = 34;
-const initialCalendarWindowStart = startOfDay(new Date());
-const historyChunkDays = 28;
-const initialCalendarWindowEnd = addMonths(initialCalendarWindowStart, initialCalendarWindowMonths);
+const initialToday = startOfDay(new Date());
+const initialCalendarWindowStart = addDays(initialToday, -30);
+const initialCalendarWindowEnd = addMonths(initialToday, initialCalendarWindowMonths);
 
 export default function Index() {
   const agendaListRef = useRef<LegendListRef>(null);
@@ -105,17 +108,13 @@ export default function Index() {
   const insets = useSafeAreaInsets();
   const hiddenCalendarIds = useHiddenCalendarIds();
   const [isCalendarSetSheetPresented, setIsCalendarSetSheetPresented] = useState(false);
+  const [calendarSheetContentHeight, setCalendarSheetContentHeight] = useState(1);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [calendarWindowStart, setCalendarWindowStart] = useState(initialCalendarWindowStart);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [historyPullState, setHistoryPullState] = useState<'idle' | 'ready' | 'cancelled'>('idle');
-  const isDraggingAgendaRef = useRef(false);
-  const agendaScrollOffsetRef = useRef(0);
-  const historyTriggerOffsetRef = useRef<number | null>(null);
   const calendarRevisionRef = useRef(0);
   const [calendarWindowEnd, setCalendarWindowEnd] = useState(initialCalendarWindowEnd);
   const [calendarStatus, setCalendarStatus] = useState<CalendarStatus>('loading');
-  const [selectedNavigationId, setSelectedNavigationId] = useState(() => getDateNavigationId(calendarWindowStart));
+  const [selectedNavigationId, setSelectedNavigationId] = useState(() => getDateNavigationId(initialToday));
   const isLoadingMoreRef = useRef(false);
   const pendingNavigationIdRef = useRef<string | null>(null);
 
@@ -189,7 +188,7 @@ export default function Index() {
     [calendarEvents, calendarWindowStart, calendarWindowEnd, hiddenCalendarIds]
   );
   const stickyWeekHeaderIndices = useMemo(
-    () => agendaModel.items.flatMap((item, index) => (item.type === 'weekHeader' ? [index] : [])),
+    () => agendaModel.items.flatMap((item, index) => item.type === 'weekHeader' ? [index] : []),
     [agendaModel.items]
   );
   const dateNavigationItems = useMemo(
@@ -239,16 +238,16 @@ export default function Index() {
     isLoadingMoreRef.current = false;
   }
 
-  const loadHistory = useCallback(async () => {
-    if (isLoadingMoreRef.current || calendarStatus === 'loading') {
+  async function loadMoreHistoryDays() {
+    if (isLoadingMoreRef.current || calendarStatus !== 'ready') {
       return;
     }
 
     isLoadingMoreRef.current = true;
-    setIsLoadingHistory(true);
     try {
-      const nextWindowStart = addDays(calendarWindowStart, -historyChunkDays);
+      const nextWindowStart = addDays(calendarWindowStart, -calendarWindowChunkDays);
       const newEvents = await loadCalendarEvents(nextWindowStart, calendarWindowStart);
+
       if (newEvents != null) {
         calendarRevisionRef.current += 1;
         setCalendarEvents((currentEvents) => sortCalendarEvents(mergeCalendarEvents(currentEvents, newEvents)));
@@ -256,40 +255,6 @@ export default function Index() {
       }
     } finally {
       isLoadingMoreRef.current = false;
-      setIsLoadingHistory(false);
-    }
-  }, [calendarStatus, calendarWindowStart, loadCalendarEvents]);
-
-  function armHistoryLoad() {
-    // Android's native refresh event already waits for release. iOS can emit it
-    // while the finger is still down, so defer the request until drag end.
-    if (Platform.OS !== 'ios') {
-      void loadHistory();
-      return;
-    }
-    if (!isDraggingAgendaRef.current || isLoadingMoreRef.current || calendarStatus === 'loading') {
-      return;
-    }
-    historyTriggerOffsetRef.current = Math.min(-1, agendaScrollOffsetRef.current);
-    setHistoryPullState('ready');
-  }
-
-  function updateHistoryPull(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const offset = event.nativeEvent.contentOffset.y;
-    agendaScrollOffsetRef.current = offset;
-    const triggerOffset = historyTriggerOffsetRef.current;
-    if (isDraggingAgendaRef.current && triggerOffset != null) {
-      setHistoryPullState(offset <= triggerOffset ? 'ready' : 'cancelled');
-    }
-  }
-
-  function finishHistoryPull(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const triggerOffset = historyTriggerOffsetRef.current;
-    isDraggingAgendaRef.current = false;
-    historyTriggerOffsetRef.current = null;
-    setHistoryPullState('idle');
-    if (triggerOffset != null && event.nativeEvent.contentOffset.y <= triggerOffset) {
-      void loadHistory();
     }
   }
 
@@ -324,24 +289,6 @@ export default function Index() {
     });
   }
 
-  const switchCalendarButton = (
-    <Stack.Toolbar.View>
-      <Pressable
-        accessibilityLabel="Switch calendar set"
-        accessibilityRole="button"
-        onPress={() => setIsCalendarSetSheetPresented(true)}
-        style={({ pressed }) => ({
-          width: 44,
-          height: 44,
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: pressed ? 0.72 : 1,
-        })}>
-        <Ionicons name="calendar-outline" size={26} color={theme.text} />
-      </Pressable>
-    </Stack.Toolbar.View>
-  );
-
   return (
     <>
       <ThemedView style={{ flex: 1 }}>
@@ -356,49 +303,27 @@ export default function Index() {
           ref={agendaListRef}
           data={agendaModel.items}
           ItemSeparatorComponent={renderThemedAgendaSeparator}
-          ListHeaderComponent={
-            <AgendaListHeader
-              borderStyle={themedBorderStyle}
-              status={calendarStatus}
-            />
-          }
+          ListHeaderComponent={<AgendaListHeader borderStyle={themedBorderStyle} status={calendarStatus} />}
           renderItem={renderAgendaItem}
           keyExtractor={(item) => item.id}
           stickyHeaderIndices={stickyWeekHeaderIndices}
           recycleItems
-          maintainVisibleContentPosition={{ data: true, size: true, shouldRestorePosition: (item) => item.type === 'day' }}
-          refreshControl={
-            <RefreshControl
-              refreshing={isLoadingHistory || historyPullState !== 'idle'}
-              onRefresh={armHistoryLoad}
-              title={isLoadingHistory ? 'Loading history…' : historyPullState === 'ready' ? 'Release to load history' : 'Pull to load history'}
-              titleColor={theme.textSecondary}
-              tintColor={theme.primary}
-              colors={[theme.primary]}
-              progressBackgroundColor={theme.background}
-            />
-          }
+          initialScrollIndex={{ index: agendaModel.items.findIndex((item) => item.id === toDayKey(initialToday)), viewOffset: weekHeaderHeight }}
+          maintainVisibleContentPosition
           onFirstVisibleItemChanged={updateSelectedNavigationItem}
           onMomentumScrollEnd={clearPendingNavigation}
-          onScrollBeginDrag={() => {
-            clearPendingNavigation();
-            isDraggingAgendaRef.current = true;
-            historyTriggerOffsetRef.current = null;
-            setHistoryPullState('idle');
-          }}
-          onScroll={updateHistoryPull}
-          onScrollEndDrag={finishHistoryPull}
-          onTouchCancel={() => {
-            isDraggingAgendaRef.current = false;
-            historyTriggerOffsetRef.current = null;
-            setHistoryPullState('idle');
-          }}
+          onScrollBeginDrag={clearPendingNavigation}
+          bounces={Platform.OS === 'ios'}
+          alwaysBounceVertical={Platform.OS === 'ios'}
+          overScrollMode="never"
           scrollEventThrottle={16}
           onEndReached={loadMoreFutureDays}
           onEndReachedThreshold={0.6}
+          onStartReached={loadMoreHistoryDays}
+          onStartReachedThreshold={0.6}
           showsVerticalScrollIndicator={false}
           estimatedItemSize={96}
-          style={[{ flex: 1 }, { backgroundColor: theme.background }]}
+          style={{ flex: 1, backgroundColor: theme.background }}
         />
       </ThemedView>
       <BottomSheet
@@ -406,34 +331,76 @@ export default function Index() {
         onDismiss={() => setIsCalendarSetSheetPresented(false)}
         containerColor={theme.background}
         testID="calendar-set-sheet">
-        <RNHostView matchContents>
-          <View style={{ paddingTop: spacing.base, paddingBottom: spacing.double, gap: spacing.double }}>
-            <AppText variant="title2" weight="semibold" accessibilityRole="header">
-              Calendar Sets
-            </AppText>
-            <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: theme.border }}>
+        <Column
+          style={{ height: calendarSheetContentHeight }}
+          modifiers={Platform.OS === 'ios'
+            ? [frame({ maxWidth: Infinity, height: calendarSheetContentHeight })]
+            : [fillMaxWidth()]}>
+          <RNHostView>
+            <View
+              onLayout={(event) => setCalendarSheetContentHeight(Math.ceil(event.nativeEvent.layout.height))}
+              style={{ width: '100%', flexShrink: 0, paddingTop: spacing.base, paddingBottom: spacing.double, gap: spacing.double }}>
+              <AppText variant="title2" weight="semibold" accessibilityRole="header">
+                Calendar Sets
+              </AppText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: theme.border }}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setIsCalendarSetSheetPresented(false)}
+                  style={({ pressed }) => ({ flex: 1, minHeight: 56, justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
+                  <AppText>Main Calendar Set</AppText>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit Main Calendar Set"
+                  onPress={() => {}}
+                  style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
+                  <Ionicons name="pencil-outline" size={22} color={theme.primary} />
+                </Pressable>
+              </View>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => setIsCalendarSetSheetPresented(false)}
-                style={({ pressed }) => ({ flex: 1, minHeight: 56, justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
-                <AppText>Main Calendar Set</AppText>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Edit Main Calendar Set"
                 onPress={() => {}}
-                style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
-                <Ionicons name="pencil-outline" size={22} color={theme.primary} />
+                style={({ pressed }) => ({ minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: withOpacity(theme.primary, 0.12), opacity: pressed ? 0.72 : 1 })}>
+                <AppText weight="semibold" style={{ color: theme.primary }}>Add Calendar Set</AppText>
               </Pressable>
+              <View style={{ borderTopWidth: 1, borderColor: theme.border }}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setIsCalendarSetSheetPresented(false);
+                    router.push('./calendars');
+                  }}
+                  style={({ pressed }) => ({ minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', opacity: pressed ? 0.72 : 1 })}>
+                  <AppText>Calendars</AppText>
+                  <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                </Pressable>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.double }}>
+                  <Pressable
+                    accessibilityRole="link"
+                    onPress={() => {
+                      setIsCalendarSetSheetPresented(false);
+                      void Linking.openURL('https://daymo.flown.io/').catch((error) => {
+                        console.warn('Failed to open About Daymo', error);
+                      });
+                    }}
+                    style={({ pressed }) => ({ minHeight: 48, justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
+                    <AppText style={{ color: theme.primary }}>About Daymo</AppText>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="link"
+                    onPress={() => {
+                      setIsCalendarSetSheetPresented(false);
+                      openPrivacyPolicy();
+                    }}
+                    style={({ pressed }) => ({ minHeight: 48, justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
+                    <AppText style={{ color: theme.primary }}>Privacy Policy</AppText>
+                  </Pressable>
+                </View>
+              </View>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {}}
-              style={({ pressed }) => ({ minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: withOpacity(theme.primary, 0.12), opacity: pressed ? 0.72 : 1 })}>
-              <AppText weight="semibold" style={{ color: theme.primary }}>Add Calendar Set</AppText>
-            </Pressable>
-          </View>
-        </RNHostView>
+          </RNHostView>
+        </Column>
       </BottomSheet>
       <Stack.Screen
         options={{
@@ -445,35 +412,24 @@ export default function Index() {
           pointerEvents="box-none"
           style={{
             bottom: 0,
-            height: 64 + insets.bottom,
+            paddingBottom: insets.bottom,
             left: spacing.base,
             position: 'absolute',
-            right: spacing.base,
+            alignItems: 'flex-start',
           }}>
-          <Stack.Toolbar>
-            <Stack.Toolbar.View>
-              <View style={{ alignItems: 'center', flexDirection: 'row', gap: spacing.base }}>
+          <Host matchContents>
+            <HorizontalFloatingToolbar modifiers={[height(64)]}>
+              <RNHostView matchContents>
                 <ToolbarTextButton label="Today" onPress={scrollToToday} />
-              </View>
-            </Stack.Toolbar.View>
-            <Stack.Toolbar.Button
-              accessibilityLabel="Add event"
-              icon={AddIcon}
-              onPress={() => { posthog.capture('new_event_opened'); router.push('/new-event'); }}
-            />
-            <Stack.Toolbar.Menu
-              accessibilityLabel="More options"
-              icon={MoreHorizIcon}>
-              <Stack.Toolbar.MenuAction onPress={() => router.push('./calendars')}>
-                Calendars
-              </Stack.Toolbar.MenuAction>
-              <Stack.Toolbar.MenuAction onPress={openPrivacyPolicy}>
-                Privacy Policy
-              </Stack.Toolbar.MenuAction>
-            </Stack.Toolbar.Menu>
-            <Stack.Toolbar.Spacer width={spacing.base} />
-            {switchCalendarButton}
-          </Stack.Toolbar>
+              </RNHostView>
+              <IconButton onClick={() => { posthog.capture('new_event_opened'); router.push('/new-event'); }}>
+                <Icon source={AddIcon} size={24} tint={theme.text} contentDescription="Add event" />
+              </IconButton>
+              <IconButton onClick={() => setIsCalendarSetSheetPresented(true)}>
+                <Icon source={MoreHorizIcon} size={24} tint={theme.text} contentDescription="More options" />
+              </IconButton>
+            </HorizontalFloatingToolbar>
+          </Host>
         </View>
       ) : (
         <Stack.Toolbar>
@@ -485,18 +441,12 @@ export default function Index() {
             icon="plus"
             onPress={() => { posthog.capture('new_event_opened'); router.push('/new-event'); }}
           />
-          <Stack.Toolbar.Menu
+          <Stack.Toolbar.Button
             accessibilityLabel="More options"
-            icon="ellipsis">
-            <Stack.Toolbar.MenuAction onPress={() => router.push('./calendars')}>
-              Calendars
-            </Stack.Toolbar.MenuAction>
-            <Stack.Toolbar.MenuAction onPress={openPrivacyPolicy}>
-              Privacy Policy
-            </Stack.Toolbar.MenuAction>
-          </Stack.Toolbar.Menu>
+            icon="ellipsis"
+            onPress={() => setIsCalendarSetSheetPresented(true)}
+          />
           <Stack.Toolbar.Spacer />
-          {switchCalendarButton}
         </Stack.Toolbar>
       )}
     </>
@@ -735,18 +685,8 @@ function CalendarStatusBanner({ borderStyle, status }: { borderStyle: { borderCo
   );
 }
 
-function AgendaListHeader({
-  borderStyle,
-  status,
-}: {
-  borderStyle: { borderColor: string };
-  status: CalendarStatus;
-}) {
-  return (
-    <>
-      {status !== 'ready' ? <CalendarStatusBanner borderStyle={borderStyle} status={status} /> : null}
-    </>
-  );
+function AgendaListHeader({ borderStyle, status }: { borderStyle: { borderColor: string }; status: CalendarStatus }) {
+  return status !== 'ready' ? <CalendarStatusBanner borderStyle={borderStyle} status={status} /> : null;
 }
 
 function renderAgendaItem({ item }: LegendListRenderItemProps<AgendaItem>) {
@@ -754,12 +694,7 @@ function renderAgendaItem({ item }: LegendListRenderItemProps<AgendaItem>) {
     return (
       <ThemedView
         type="backgroundElementOpaque"
-        style={{
-          alignItems: 'center',
-          height: weekHeaderHeight,
-          justifyContent: 'center',
-          position: 'relative',
-        }}>
+        style={{ alignItems: 'center', height: weekHeaderHeight, justifyContent: 'center', position: 'relative' }}>
         <MultiDayDividerIndicator events={item.continuationEvents} />
         <AppText selectable variant="footnote" weight="semibold" themeColor="textSecondary">
           {item.label}
@@ -775,24 +710,20 @@ function DayAgendaItem({ item }: { item: Extract<AgendaItem, { type: 'day' }> })
   const router = useRouter();
   const theme = useTheme();
   const dateTextStyle = item.isToday ? { color: theme.primary } : item.isWeekend ? { color: theme.textDestructive } : null;
-  const [indicatorStarts, setIndicatorStarts] = useState<Record<string, number>>({});
-  const onEventLayout = useCallback((id: string, centerY: number) => {
-    setIndicatorStarts((current) => current[id] === centerY ? current : { ...current, [id]: centerY });
-  }, []);
 
   function openDay() {
     router.push({ pathname: './day', params: { date: item.id } });
   }
 
   return (
-    <ThemedView>
+    <ThemedView type={item.isPast ? 'backgroundHistory' : 'background'}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`View events for ${item.weekday}, ${item.id}`}
         onPress={openDay}
         onLongPress={openDay}
         style={{ flexDirection: 'row', alignItems: 'stretch', position: 'relative', paddingLeft: spacing.double }}>
-        <MultiDayIndicator events={getMultiDayIndicatorEvents(item.events)} starts={indicatorStarts} />
+        <MultiDayIndicator events={getMultiDayIndicatorEvents(item.events)} />
         <View pointerEvents="none" style={{ width: spacing.double * 2, alignItems: 'center', paddingVertical: spacing.double, gap: spacing.base }}>
           <AppText variant="caption2" weight="semibold" style={dateTextStyle}>{item.weekday}</AppText>
           <View style={{ width: spacing.double * 2, alignItems: 'center', justifyContent: 'center', marginTop: -spacing.base / 2 }}>
@@ -802,7 +733,7 @@ function DayAgendaItem({ item }: { item: Extract<AgendaItem, { type: 'day' }> })
           </View>
         </View>
         <View pointerEvents="none" style={{ flex: 1, paddingLeft: spacing.double, paddingRight: spacing.base }}>
-          <AgendaEvents events={item.events} onEventLayout={onEventLayout} />
+          <AgendaEvents events={item.events} />
         </View>
       </Pressable>
     </ThemedView>
@@ -834,13 +765,13 @@ function AgendaSeparator({ color, events = [] }: { color: string; events?: Agend
   );
 }
 
-function AgendaEvents({ events, onEventLayout }: { events: AgendaEvent[]; onEventLayout: (id: string, centerY: number) => void }) {
+function AgendaEvents({ events }: { events: AgendaEvent[] }) {
   const indicatorEvents = getMultiDayIndicatorEvents(events);
   const visibleEvents = events
     .filter((event) => event.display !== 'multiDay' || event.showLabel)
     .sort((first, second) => Number(indicatorEvents.includes(second)) - Number(indicatorEvents.includes(first)));
-  // Center ordinary event dots on the right edge of the rightmost active line.
-  const contentInset = indicatorEvents.length > 0 ? getMultiDayIndicatorWidth(indicatorEvents) - eventDotStyle.width / 2 : 0;
+  // Leave a small gap between timed event dots and the rightmost all-day line.
+  const contentInset = indicatorEvents.length > 0 ? getMultiDayIndicatorWidth(indicatorEvents) + spacing.base : 0;
 
   return (
     <View pointerEvents="box-none" style={{ minHeight: spacing.double * 2, paddingVertical: spacing.base }}>
@@ -849,7 +780,7 @@ function AgendaEvents({ events, onEventLayout }: { events: AgendaEvent[]; onEven
           key={event.id}
           event={event}
           inset={indicatorEvents.includes(event) ? (event.indicatorLane ?? 0) * multiDayIndicatorLaneWidth : contentInset}
-          onLayout={(layout) => onEventLayout(event.id, layout.nativeEvent.layout.y + layout.nativeEvent.layout.height / 2 + 1)}
+          titleInset={indicatorEvents.includes(event) ? getMultiDayIndicatorWidth(indicatorEvents) - multiDayIndicatorLineWidth - (event.indicatorLane ?? 0) * multiDayIndicatorLaneWidth : 0}
         />
       ))}
     </View>
@@ -860,7 +791,7 @@ function MultiDayDividerIndicator({ events }: { events: AgendaEvent[] }) {
   return <MultiDayIndicator events={events} roundedCaps={false} />;
 }
 
-function MultiDayIndicator({ events, starts = {}, roundedCaps = true }: { events: AgendaEvent[]; starts?: Record<string, number>; roundedCaps?: boolean }) {
+function MultiDayIndicator({ events, roundedCaps = true }: { events: AgendaEvent[]; roundedCaps?: boolean }) {
   if (events.length === 0) {
     return null;
   }
@@ -875,12 +806,12 @@ function MultiDayIndicator({ events, starts = {}, roundedCaps = true }: { events
         top: 0,
         width: getMultiDayIndicatorWidth(events),
       }}>
-      <MultiDayIndicatorCanvas events={events} starts={starts} roundedCaps={roundedCaps} />
+      <MultiDayIndicatorCanvas events={events} roundedCaps={roundedCaps} />
     </View>
   );
 }
 
-function MultiDayIndicatorCanvas({ events, starts, roundedCaps = true }: { events: AgendaEvent[]; starts: Record<string, number>; roundedCaps?: boolean }) {
+function MultiDayIndicatorCanvas({ events, roundedCaps = true }: { events: AgendaEvent[]; roundedCaps?: boolean }) {
   const theme = useTheme();
 
   return (
@@ -889,7 +820,7 @@ function MultiDayIndicatorCanvas({ events, starts, roundedCaps = true }: { event
         <View
           key={`${event.id}-line`}
           style={{
-            ...getMultiDayIndicatorStyle(event, roundedCaps, starts[event.id]),
+            ...getMultiDayIndicatorStyle(event, roundedCaps),
             backgroundColor: theme.background,
             borderColor: theme.background,
             borderLeftWidth: 1,
@@ -902,6 +833,8 @@ function MultiDayIndicatorCanvas({ events, starts, roundedCaps = true }: { event
             flex: 1,
             backgroundColor: event.color,
             opacity: 0.22,
+            borderTopLeftRadius: roundedCaps && !event.continuesBefore ? multiDayIndicatorLineRadius - 1 : 0,
+            borderTopRightRadius: roundedCaps && !event.continuesBefore ? multiDayIndicatorLineRadius - 1 : 0,
             borderBottomLeftRadius: roundedCaps && !event.continuesAfter ? multiDayIndicatorLineRadius - 1 : 0,
             borderBottomRightRadius: roundedCaps && !event.continuesAfter ? multiDayIndicatorLineRadius - 1 : 0,
           }} />
@@ -912,7 +845,7 @@ function MultiDayIndicatorCanvas({ events, starts, roundedCaps = true }: { event
 }
 
 function getMultiDayIndicatorEvents(events: AgendaEvent[]) {
-  return events.filter((event) => event.display === 'multiDay' && (event.continuesBefore || event.continuesAfter));
+  return events.filter((event) => event.display === 'multiDay');
 }
 
 function getMultiDaySeparatorEvents(events: AgendaEvent[]) {
@@ -928,9 +861,8 @@ function getMultiDayIndicatorWidth(events: AgendaEvent[]) {
   return maxLane * multiDayIndicatorLaneWidth + multiDayIndicatorLineWidth;
 }
 
-function getMultiDayIndicatorStyle(event: AgendaEvent, roundedCaps: boolean, start?: number) {
+function getMultiDayIndicatorStyle(event: AgendaEvent, roundedCaps: boolean) {
   const lane = event.indicatorLane ?? 0;
-  const hasStartCap = roundedCaps && !event.continuesBefore;
   const hasEndCap = roundedCaps && !event.continuesAfter;
   const topRadius = roundedCaps && !event.continuesBefore ? multiDayIndicatorLineRadius : 0;
   const bottomRadius = roundedCaps && !event.continuesAfter ? multiDayIndicatorLineRadius : 0;
@@ -944,18 +876,18 @@ function getMultiDayIndicatorStyle(event: AgendaEvent, roundedCaps: boolean, sta
     bottom: hasEndCap ? multiDayIndicatorEndInset : 0,
     position: 'absolute' as const,
     left: lane * multiDayIndicatorLaneWidth,
-    top: hasStartCap ? (start ?? spacing.base + agendaEventRowMinHeight / 2 + 1) : 0,
+    top: roundedCaps && !event.continuesBefore ? multiDayIndicatorEndInset : 0,
     width: multiDayIndicatorLineWidth,
   };
 }
 
-function AgendaEventRow({ event, inset = 0, onLayout }: { event: AgendaEvent; inset?: number; onLayout?: (event: LayoutChangeEvent) => void }) {
+function AgendaEventRow({ event, inset = 0, titleInset = 0 }: { event: AgendaEvent; inset?: number; titleInset?: number }) {
   const theme = useTheme();
   const eventContent =
     event.display === 'multiDay' ? (
       <>
         <View style={[eventDotStyle, { backgroundColor: event.color, borderColor: theme.background }]} />
-        <AppText variant="body" style={{ flex: 1 }}>
+        <AppText variant="body" style={{ flex: 1, marginLeft: titleInset }}>
           {event.title}
         </AppText>
       </>
@@ -972,7 +904,7 @@ function AgendaEventRow({ event, inset = 0, onLayout }: { event: AgendaEvent; in
     );
 
   return (
-    <View onLayout={onLayout} pointerEvents="box-none" style={{ minHeight: agendaEventRowMinHeight, marginLeft: inset, flexDirection: 'row', alignItems: 'center', gap: spacing.base }}>
+    <View pointerEvents="box-none" style={{ minHeight: agendaEventRowMinHeight, marginLeft: inset, flexDirection: 'row', alignItems: 'center', gap: spacing.base }}>
       <View
         style={{
           minHeight: agendaEventRowMinHeight,
@@ -1062,6 +994,7 @@ function buildDayAgendaItem(date: Date, events: AgendaEvent[], todayKey: string)
     dayNumber: String(date.getDate()),
     weekday: weekdayNames[date.getDay()],
     isToday: dayKey === todayKey,
+    isPast: dayKey < todayKey,
     isWeekend: date.getDay() === 0,
     events,
   };
@@ -1085,11 +1018,7 @@ function groupEventsByDay(events: CalendarEvent[], visibleStartDate: Date, visib
       return startDifference === 0 ? first.endDate.getTime() - second.endDate.getTime() : startDifference;
     });
 
-  assignIndicatorLanes(
-    blockEvents.filter(({ startDate, endDate }) =>
-      isMultiDayRange({ startDate, endDateExclusive: endDate })
-    )
-  );
+  assignIndicatorLanes(blockEvents);
 
   for (const { event, startDate, endDate, lane } of blockEvents) {
     const firstVisibleDate = maxDate(startDate, visibleStartDate);
@@ -1300,5 +1229,5 @@ const eventDotStyle = {
 const agendaEventRowMinHeight = 28;
 const multiDayIndicatorLineWidth = 12;
 const multiDayIndicatorLineRadius = multiDayIndicatorLineWidth / 2;
-const multiDayIndicatorLaneWidth = 6;
+const multiDayIndicatorLaneWidth = multiDayIndicatorLineWidth + 1;
 const multiDayIndicatorEndInset = spacing.base;
