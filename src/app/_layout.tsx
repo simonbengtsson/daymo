@@ -77,6 +77,7 @@ export default function TabLayout() {
                 headerTransparent: Platform.OS === 'ios',
               }}
             />
+            <Stack.Screen name="calendar-set" options={{ presentation: 'modal' }} />
             <Stack.Screen
               name="calendars"
               options={{ presentation: 'modal' }}

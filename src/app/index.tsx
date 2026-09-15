@@ -1,7 +1,8 @@
 import AddIcon from '@expo/material-symbols/add.xml';
+import CalendarIcon from '@expo/material-symbols/calendar_month.xml';
 import MoreHorizIcon from '@expo/material-symbols/more_horiz.xml';
 import { BottomSheet, Column, RNHostView } from '@expo/ui';
-import { HorizontalFloatingToolbar, Host, Icon, IconButton } from '@expo/ui/jetpack-compose';
+import { DropdownMenu, DropdownMenuItem, HorizontalFloatingToolbar, Host, Icon, IconButton, Text as ComposeText } from '@expo/ui/jetpack-compose';
 import { fillMaxWidth, height } from '@expo/ui/jetpack-compose/modifiers';
 import { frame } from '@expo/ui/swift-ui/modifiers';
 import { LegendList, type LegendListRef, type LegendListRenderItemProps } from '@legendapp/list/react-native';
@@ -11,6 +12,7 @@ import * as Linking from 'expo-linking';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   AppState,
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -30,6 +32,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addDays, getEventDayRange, isMultiDayRange, startOfDay, toDate } from '@/lib/calendar-event-range';
+import { includesCalendar, selectCalendarSet, useCalendarSets } from '@/lib/calendar-sets';
 import { useHiddenCalendarIds } from '@/lib/calendar-visibility';
 
 type AgendaItem =
@@ -107,8 +110,11 @@ export default function Index() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const hiddenCalendarIds = useHiddenCalendarIds();
+  const { sets: calendarSets, activeId: activeCalendarSetId } = useCalendarSets();
+  const [isMoreMenuExpanded, setIsMoreMenuExpanded] = useState(false);
   const [isCalendarSetSheetPresented, setIsCalendarSetSheetPresented] = useState(false);
   const [calendarSheetContentHeight, setCalendarSheetContentHeight] = useState(1);
+  const [deviceCalendars, setDeviceCalendars] = useState<Calendar.ExpoCalendar[] | null>(null);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [calendarWindowStart, setCalendarWindowStart] = useState(initialCalendarWindowStart);
   const calendarRevisionRef = useRef(0);
@@ -117,6 +123,16 @@ export default function Index() {
   const [selectedNavigationId, setSelectedNavigationId] = useState(() => getDateNavigationId(initialToday));
   const isLoadingMoreRef = useRef(false);
   const pendingNavigationIdRef = useRef<string | null>(null);
+
+  const moreActions = [
+    { label: 'Privacy Policy', onPress: openPrivacyPolicy },
+    { label: 'Calendars', onPress: () => router.push('/calendars') },
+    { label: 'About Daymo', onPress: () => {
+      void Linking.openURL('https://daymo.flown.io/').catch((error) => {
+        console.warn('Failed to open About Daymo', error);
+      });
+    } },
+  ];
 
   const loadCalendarEvents = useCallback(async (startDate: Date, endDate: Date) => {
     if (Platform.OS === 'web') {
@@ -133,6 +149,7 @@ export default function Index() {
       }
 
       const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
+      setDeviceCalendars(calendars);
       const calendarColors = new Map(calendars.map((calendar) => [calendar.id, calendar.color ?? primaryColor]));
       const events = await Calendar.listEvents(calendars, startDate, endDate);
 
@@ -339,64 +356,74 @@ export default function Index() {
           <RNHostView>
             <View
               onLayout={(event) => setCalendarSheetContentHeight(Math.ceil(event.nativeEvent.layout.height))}
-              style={{ width: '100%', flexShrink: 0, paddingTop: spacing.base, paddingBottom: spacing.double, gap: spacing.double }}>
-              <AppText variant="title2" weight="semibold" accessibilityRole="header">
+              style={{ width: '100%', flexShrink: 0, paddingTop: spacing.base }}>
+              <AppText variant="title2" weight="semibold" accessibilityRole="header" style={{ marginBottom: spacing.base }}>
                 Calendar Sets
               </AppText>
-              <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: theme.border }}>
+              <View>
+              {calendarSets.map((set) => {
+                const selectedCalendars = deviceCalendars?.filter((calendar) => includesCalendar(set, calendar.id));
+                return (
+              <View key={set.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1, backgroundColor: theme.border }} />
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => setIsCalendarSetSheetPresented(false)}
-                  style={({ pressed }) => ({ flex: 1, minHeight: 56, justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
-                  <AppText>Main Calendar Set</AppText>
+                  accessibilityState={{ selected: set.id === activeCalendarSetId }}
+                  onPress={() => {
+                    try {
+                      selectCalendarSet(set.id);
+                      setIsCalendarSetSheetPresented(false);
+                    } catch (error) {
+                      console.warn('Failed to select calendar set', error);
+                      Alert.alert('Could not select calendar set', 'Please try again.');
+                    }
+                  }}
+                  style={({ pressed }) => ({ flex: 1, minHeight: 68, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.base, opacity: pressed ? 0.72 : 1 })}>
+                  <View style={{ width: 22, alignItems: 'center' }}>
+                    {set.id === activeCalendarSetId ? <Ionicons name="checkmark" size={18} color={theme.primary} /> : null}
+                  </View>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <AppText weight={set.id === activeCalendarSetId ? 'semibold' : 'regular'}>{set.name}</AppText>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                      {selectedCalendars && selectedCalendars.length > 0 ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                          {selectedCalendars.slice(0, 6).map((calendar) => (
+                            <View key={calendar.id} style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: calendar.color ?? theme.primary }} />
+                          ))}
+                          {selectedCalendars.length > 6 ? (
+                            <AppText variant="caption2" themeColor="textSecondary">+{selectedCalendars.length - 6}</AppText>
+                          ) : null}
+                        </View>
+                      ) : null}
+                      <AppText variant="footnote" themeColor="textSecondary">
+                        {selectedCalendars ? `${selectedCalendars.length} ${selectedCalendars.length === 1 ? 'calendar' : 'calendars'}` : 'Loading calendars…'}
+                      </AppText>
+                    </View>
+                  </View>
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Edit Main Calendar Set"
-                  onPress={() => {}}
-                  style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
-                  <Ionicons name="pencil-outline" size={22} color={theme.primary} />
-                </Pressable>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {}}
-                style={({ pressed }) => ({ minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: withOpacity(theme.primary, 0.12), opacity: pressed ? 0.72 : 1 })}>
-                <AppText weight="semibold" style={{ color: theme.primary }}>Add Calendar Set</AppText>
-              </Pressable>
-              <View style={{ borderTopWidth: 1, borderColor: theme.border }}>
-                <Pressable
-                  accessibilityRole="button"
+                  accessibilityLabel={`Edit ${set.name}`}
                   onPress={() => {
                     setIsCalendarSetSheetPresented(false);
-                    router.push('./calendars');
+                    router.push({ pathname: '/calendar-set', params: { id: set.id } });
                   }}
-                  style={({ pressed }) => ({ minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', opacity: pressed ? 0.72 : 1 })}>
-                  <AppText>Calendars</AppText>
-                  <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                  style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
+                  <Ionicons name="pencil-outline" size={18} color={theme.textSecondary} />
                 </Pressable>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.double }}>
-                  <Pressable
-                    accessibilityRole="link"
-                    onPress={() => {
-                      setIsCalendarSetSheetPresented(false);
-                      void Linking.openURL('https://daymo.flown.io/').catch((error) => {
-                        console.warn('Failed to open About Daymo', error);
-                      });
-                    }}
-                    style={({ pressed }) => ({ minHeight: 48, justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
-                    <AppText style={{ color: theme.primary }}>About Daymo</AppText>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="link"
-                    onPress={() => {
-                      setIsCalendarSetSheetPresented(false);
-                      openPrivacyPolicy();
-                    }}
-                    style={({ pressed }) => ({ minHeight: 48, justifyContent: 'center', opacity: pressed ? 0.72 : 1 })}>
-                    <AppText style={{ color: theme.primary }}>Privacy Policy</AppText>
-                  </Pressable>
-                </View>
+              </View>
+              );
+              })}
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setIsCalendarSetSheetPresented(false);
+                  router.push('/calendar-set');
+                }}
+                style={({ pressed }) => ({ minHeight: 56, paddingVertical: spacing.base, flexDirection: 'row', alignItems: 'center', gap: spacing.base, opacity: pressed ? 0.72 : 1 })}>
+                <Ionicons name="add" size={22} color={theme.primary} />
+                <AppText style={{ flexShrink: 1, color: theme.primary }}>New Calendar Set</AppText>
+              </Pressable>
               </View>
             </View>
           </RNHostView>
@@ -414,8 +441,11 @@ export default function Index() {
             bottom: 0,
             paddingBottom: insets.bottom,
             left: spacing.base,
+            right: spacing.base,
             position: 'absolute',
-            alignItems: 'flex-start',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
           }}>
           <Host matchContents>
             <HorizontalFloatingToolbar modifiers={[height(64)]}>
@@ -426,8 +456,26 @@ export default function Index() {
                 <Icon source={AddIcon} size={24} tint={theme.text} contentDescription="Add event" />
               </IconButton>
               <IconButton onClick={() => setIsCalendarSetSheetPresented(true)}>
-                <Icon source={MoreHorizIcon} size={24} tint={theme.text} contentDescription="More options" />
+                <Icon source={CalendarIcon} size={24} tint={theme.text} contentDescription="Calendar sets" />
               </IconButton>
+            </HorizontalFloatingToolbar>
+          </Host>
+          <Host matchContents>
+            <HorizontalFloatingToolbar modifiers={[height(64)]}>
+              <DropdownMenu expanded={isMoreMenuExpanded} onDismissRequest={() => setIsMoreMenuExpanded(false)}>
+                <DropdownMenu.Trigger>
+                  <IconButton onClick={() => setIsMoreMenuExpanded(true)}>
+                    <Icon source={MoreHorizIcon} size={24} tint={theme.text} contentDescription="More options" />
+                  </IconButton>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Items>
+                  {moreActions.map((action) => (
+                    <DropdownMenuItem key={action.label} onClick={() => { setIsMoreMenuExpanded(false); action.onPress(); }}>
+                      <DropdownMenuItem.Text><ComposeText>{action.label}</ComposeText></DropdownMenuItem.Text>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenu.Items>
+              </DropdownMenu>
             </HorizontalFloatingToolbar>
           </Host>
         </View>
@@ -442,11 +490,18 @@ export default function Index() {
             onPress={() => { posthog.capture('new_event_opened'); router.push('/new-event'); }}
           />
           <Stack.Toolbar.Button
-            accessibilityLabel="More options"
-            icon="ellipsis"
+            accessibilityLabel="Calendar sets"
+            icon="calendar"
             onPress={() => setIsCalendarSetSheetPresented(true)}
           />
           <Stack.Toolbar.Spacer />
+          <Stack.Toolbar.Menu accessibilityLabel="More options" icon="ellipsis" separateBackground>
+            {moreActions.map((action) => (
+              <Stack.Toolbar.MenuAction key={action.label} onPress={action.onPress}>
+                {action.label}
+              </Stack.Toolbar.MenuAction>
+            ))}
+          </Stack.Toolbar.Menu>
         </Stack.Toolbar>
       )}
     </>
