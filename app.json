@@ -2,7 +2,7 @@
   "expo": {
     "name": "Daymo",
     "slug": "daymo",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "daymo",
@@ -11,14 +11,14 @@
       "icon": "./assets/images/icon.png",
       "appleTeamId": "V5SYU7LHMG",
       "bundleIdentifier": "io.flown.daymo",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "config": {
         "usesNonExemptEncryption": false
       },
       "supportsTablet": true
     },
     "android": {
-      "versionCode": 10,
+      "versionCode": 11,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
